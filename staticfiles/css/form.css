@@ -1,0 +1,145 @@
+/* community-finance-app/static/css/form.css */
+
+/* ===== Auth Form Section Styling (for Register and Login pages) ===== */
+.auth-form-section {
+    padding: 120px 0 60px; /* Adjust top padding to clear fixed navbar */
+    background: linear-gradient(135deg, #f5f7ff 0%, #e8ecff 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-form-section .container {
+    max-width: 500px;
+    background: white;
+    padding: 40px;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.auth-form-section h2 {
+    font-size: 2rem;
+    margin-bottom: 15px;
+    color: #2C3E50; /* var(--dark) */
+}
+
+.auth-form-section p {
+    color: #7F8C8D; /* var(--text-light) */
+    margin-bottom: 30px;
+}
+
+.auth-form .form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.auth-form label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #34495E; /* var(--text) */
+}
+
+.auth-form input[type="text"],
+.auth-form input[type="email"],
+.auth-form input[type="password"],
+.auth-form input[type="date"],
+.auth-form textarea,
+.auth-form select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: #34495E; /* var(--text) */
+    background-color: #fcfcfc;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.auth-form input[type="text"]:focus,
+.auth-form input[type="email"]:focus,
+.auth-form input[type="password"]:focus,
+.auth-form input[type="date"]:focus,
+.auth-form textarea:focus,
+.auth-form select:focus {
+    border-color: #007B80; /* var(--primary) */
+    box-shadow: 0 0 0 3px rgba(0, 123, 128, 0.1);
+    outline: none;
+}
+
+.auth-form .error-message {
+    color: #dc3545; /* var(--danger) */
+    font-size: 0.9em;
+    margin-top: 5px;
+    display: block;
+}
+
+.auth-form .form-text {
+    font-size: 0.85em;
+    color: #7F8C8D; /* var(--text-light) */
+}
+
+.auth-form button.btn-primary {
+    width: 100%;
+    padding: 15px;
+    font-size: 1.1rem;
+    margin-top: 20px;
+}
+
+.auth-form .flex-row-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: -10px; /* Adjust for vertical rhythm */
+    margin-bottom: 20px;
+}
+
+.auth-form .flex-row-between a {
+    color: #007B80; /* var(--primary) */
+    text-decoration: none;
+    font-size: 0.9em;
+    transition: color 0.3s ease;
+}
+.auth-form .flex-row-between a:hover {
+    color: #005F63; /* var(--primary-dark) */
+    text-decoration: underline;
+}
+
+.mt-3 { margin-top: 15px; } /* Consistent margin for paragraphs/links */
+
+
+/* ===== Messages Styling (for alerts/feedback) ===== */
+.messages {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 20px;
+}
+
+.messages li {
+    padding: 10px 15px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    font-weight: 500;
+    font-size: 0.95em;
+    border: 1px solid;
+}
+
+.messages .success {
+    background-color: #d4edda;
+    border-color: #28a745;
+    color: #155724;
+}
+
+.messages .error {
+    background-color: #f8d7da;
+    border-color: #dc3545;
+    color: #721c24;
+}
+
+.messages .info {
+    background-color: #d1ecf1;
+    border-color: #17a2b8;
+    color: #0c5460;
+}

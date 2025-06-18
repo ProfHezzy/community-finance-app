@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}My Wallet | Cooperative Savings{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/wallet.css' %}">
+{% endblock %}
+
+{% block breadcrumb_items %}
+<i class="fas fa-chevron-right"></i>
+<span>Wallet</span>
+{% endblock %}
+
+{% block content %}
+<div class="wallet-container">
+    <div class="container">
+        <section class="wallet-summary">
+            <div class="wallet-card primary">
+                <div class="wallet-header">
+                    <h2><i class="fas fa-wallet"></i> Main Wallet</h2>
+                    <span class="wallet-status active">Active</span>
+                </div>
+                <div class="wallet-balance">
+                    <h3>Available Balance</h3>
+                    <h1>₦{{ wallet.balance|intcomma }}</h1> {# Use 'wallet' from context, not 'user.wallet' #}
+                </div>
+                <div class="wallet-actions">
+                    <button class="btn btn-light" id="fund-wallet-btn">
+                        <i class="fas fa-plus-circle"></i> Fund Wallet
+                    </button>
+                    <button class="btn btn-light" id="withdraw-wallet-btn">
+                        <i class="fas fa-arrow-up"></i> Withdraw
+                    </button>
+                    <button class="btn btn-light" id="transfer-wallet-btn">
+                        <i class="fas fa-exchange-alt"></i> Transfer
+                    </button>
+                </div>
+            </div>
+
+            <div class="wallet-stats">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-arrow-down"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Total Deposits</h3>
+                        {# Assuming wallet model has total_deposits method/property or calculate in view #}
+                        <h2>₦{{ wallet.total_deposits|intcomma }}</h2> 
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-arrow-up"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Total Withdrawals</h3>
+                        {# Assuming wallet model has total_withdrawals method/property or calculate in view #}
+                        <h2>₦{{ wallet.total_withdrawals|intcomma }}</h2>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-hand-holding-usd"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Last Transaction</h3>
+                        <h2>
+                            {% if last_transaction %}
+                                ₦{{ last_transaction.amount|intcomma }}
+                            {% else %}
+                                ₦0
+                            {% endif %}
+                        </h2>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="transaction-history">
+            <div class="section-header">
+                <h2><i class="fas fa-history"></i> Transaction History</h2>
+                <div class="transaction-filters">
+                    <select class="form-select" id="transaction-type">
+                        {# Set 'selected' based on 'selected_type' from context #}
+                        <option value="all" {% if selected_type == 'all' %}selected{% endif %}>All Transactions</option>
+                        <option value="deposit" {% if selected_type == 'deposit' %}selected{% endif %}>Deposits</option>
+                        <option value="withdrawal" {% if selected_type == 'withdrawal' %}selected{% endif %}>Withdrawals</option>
+                        <option value="transfer" {% if selected_type == 'transfer' %}selected{% endif %}>Transfers</option>
+                        <option value="contribution" {% if selected_type == 'contribution' %}selected{% endif %}>Contributions</option> {# Added for group contributions #}
+                    </select>
+                    <select class="form-select" id="transaction-period">
+                        {# Set 'selected' based on 'selected_period' from context #}
+                        <option value="7days" {% if selected_period == '7days' %}selected{% endif %}>Last 7 Days</option>
+                        <option value="30days" {% if selected_period == '30days' %}selected{% endif %}>Last 30 Days</option>
+                        <option value="90days" {% if selected_period == '90days' %}selected{% endif %}>Last 90 Days</option>
+                        <option value="all" {% if selected_period == 'all' %}selected{% endif %}>All Time</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="transaction-list">
+                {% if transactions %}
+                    {% for transaction in transactions %}
+                        <div class="transaction-item" data-type="{{ transaction.transaction_type }}" data-date="{{ transaction.timestamp|date:'Y-m-d' }}">
+                            <div class="transaction-icon">
+                                {% if transaction.transaction_type == 'deposit' %}
+                                    <i class="fas fa-arrow-down success"></i>
+                                {% elif transaction.transaction_type == 'withdrawal' %}
+                                    <i class="fas fa-arrow-up danger"></i>
+                                {% elif transaction.transaction_type == 'transfer' %}
+                                    <i class="fas fa-exchange-alt primary"></i>
+                                {% elif transaction.transaction_type == 'contribution' %} {# Added for group contributions #}
+                                    <i class="fas fa-hand-holding-usd info"></i>
+                                {% else %} {# Fallback for other types #}
+                                    <i class="fas fa-coins text-muted"></i>
+                                {% endif %}
+                            </div>
+                            <div class="transaction-details">
+                                {# Display human-readable type from model's get_transaction_type_display method #}
+                                <h4>{{ transaction.get_transaction_type_display }}</h4>
+                                <p>
+                                    {% if transaction.transaction_type == 'transfer' %}
+                                        {% if transaction.recipient == user %}
+                                            From {{ transaction.sender.get_full_name|default:transaction.sender.username }}
+                                        {% else %}
+                                            To {{ transaction.recipient.get_full_name|default:transaction.recipient.username }}
+                                        {% endif %}
+                                    {% elif transaction.transaction_type == 'contribution' %} {# For group contributions #}
+                                        Contribution to {{ transaction.group.name }}
+                                    {% else %}
+                                        {{ transaction.description|default:"Wallet transaction" }}
+                                    {% endif %}
+                                </p>
+                                <small>{{ transaction.timestamp|date:"M d, Y h:i A" }}</small>
+                            </div>
+                            <div class="transaction-amount 
+                                {% if transaction.transaction_type == 'deposit' or transaction.transaction_type == 'transfer' and transaction.recipient == user %}
+                                    success
+                                {% else %}
+                                    danger
+                                {% endif %}
+                            ">
+                                {% if transaction.transaction_type == 'deposit' or transaction.transaction_type == 'transfer' and transaction.recipient == user %}+{% else %}-{% endif %}₦{{ transaction.amount|intcomma }}
+                            </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-wallet"></i>
+                        <h3>No transactions yet</h3>
+                        <p>Your transaction history will appear here</p>
+                        <button class="btn btn-primary" id="fund-wallet-btn-2">
+                            <i class="fas fa-plus-circle"></i> Fund Wallet
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if transactions.has_other_pages %}
+            <div class="pagination">
+                {# Preserve current filters in pagination links #}
+                {% with current_filters='&type='|add:selected_type|add:'&period='|add:selected_period %}
+                    {% if transactions.has_previous %}
+                        <a href="?page=1{{ current_filters }}" class="page-link first"><i class="fas fa-angle-double-left"></i></a>
+                        <a href="?page={{ transactions.previous_page_number }}{{ current_filters }}" class="page-link prev"><i class="fas fa-angle-left"></i></a>
+                    {% endif %}
+
+                    {% for num in transactions.paginator.page_range %}
+                        {% if transactions.number == num %}
+                            <span class="page-link current">{{ num }}</span>
+                        {% elif num > transactions.number|add:'-3' and num < transactions.number|add:'3' %}
+                            <a href="?page={{ num }}{{ current_filters }}" class="page-link">{{ num }}</a>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if transactions.has_next %}
+                        <a href="?page={{ transactions.next_page_number }}{{ current_filters }}" class="page-link next"><i class="fas fa-angle-right"></i></a>
+                        <a href="?page={{ transactions.paginator.num_pages }}{{ current_filters }}" class="page-link last"><i class="fas fa-angle-double-right"></i></a>
+                    {% endif %}
+                {% endwith %}
+            </div>
+            {% endif %}
+        </section>
+    </div>
+</div>
+
+<div class="modal-overlay" id="fund-wallet-modal">
+    <div class="modal-content">
+        <button class="close-modal" id="close-fund-modal">&times;</button>
+        <h2><i class="fas fa-plus-circle"></i> Fund Wallet</h2>
+        
+        <form id="fund-wallet-form" method="post" action="{% url 'process_wallet_action' %}">
+            {% csrf_token %}
+            <input type="hidden" name="transaction_type" value="fund">
+            
+            <div class="form-group">
+                <label for="id_amount">Amount (₦)</label> {# Use form.field.id for Django forms #}
+                <input type="number" id="id_amount" name="amount" min="100" required> {# Ensure ID matches form field #}
+                <span class="form-note">Minimum: ₦100</span>
+            </div>
+            
+            <div class="form-group">
+                <label>Payment Method</label>
+                <div class="payment-options">
+                    {# Render form fields dynamically using Django form rendering if you pass fund_form #}
+                    {# Or keep direct inputs if you prefer manual rendering #}
+                    <label class="payment-option">
+                        <input type="radio" name="payment_method" value="bank" checked>
+                        <div class="option-card">
+                            <i class="fas fa-university"></i>
+                            <h4>Bank Transfer</h4>
+                        </div>
+                    </label>
+                    <label class="payment-option">
+                        <input type="radio" name="payment_method" value="card">
+                        <div class="option-card">
+                            <i class="fas fa-credit-card"></i>
+                            <h4>Debit Card</h4>
+                        </div>
+                    </label>
+                    <label class="payment-option">
+                        <input type="radio" name="payment_method" value="ussd">
+                        <div class="option-card">
+                            <i class="fas fa-mobile-alt"></i>
+                            <h4>USSD</h4>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block">
+                <i class="fas fa-arrow-right"></i> Proceed to Payment
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="withdraw-wallet-modal">
+    <div class="modal-content">
+        <button class="close-modal" id="close-withdraw-modal">&times;</button>
+        <h2><i class="fas fa-arrow-up"></i> Withdraw Funds</h2>
+        
+        <form id="withdraw-wallet-form" method="post" action="{% url 'process_wallet_action' %}">
+            {% csrf_token %}
+            <input type="hidden" name="transaction_type" value="withdraw">
+            
+            <div class="form-group">
+                <label for="id_withdraw-amount">Amount (₦)</label> {# Changed ID to match convention, ensure consistency #}
+                <input type="number" id="id_withdraw-amount" name="amount" 
+                        min="500" max="{{ wallet.balance|floatformat:0 }}" required> {# Use 'wallet' from context #}
+                <span class="form-note">Available: ₦{{ wallet.balance|intcomma }}</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="id_bank-account">Bank Account</label> {# Changed ID to match convention #}
+                <select id="id_bank-account" name="bank_account" required>
+                    <option value="">Select Bank Account</option>
+                    {# You need to pass 'bank_accounts' from your wallet_view context #}
+                    {# Assuming 'bank_accounts' is a list of objects with 'id', 'bank_name', 'account_number' #}
+                    {% for account in bank_accounts %}
+                    <option value="{{ account.id }}">{{ account.bank_name }} - {{ account.account_number }}</option>
+                    {% empty %}
+                    <option value="" disabled>No bank accounts added</option>
+                    {% endfor %}
+                </select>
+                <a href="#" class="add-bank-link">+ Add New Bank Account</a> {# Link for adding bank account #}
+            </div>
+            
+            <div class="form-group">
+                <label for="id_withdraw-note">Note (Optional)</label> {# Changed ID to match convention #}
+                <textarea id="id_withdraw-note" name="note" rows="2" placeholder="Purpose of withdrawal"></textarea>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block">
+                <i class="fas fa-paper-plane"></i> Request Withdrawal
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="transfer-wallet-modal">
+    <div class="modal-content">
+        <button class="close-modal" id="close-transfer-modal">&times;</button>
+        <h2><i class="fas fa-exchange-alt"></i> Transfer Funds</h2>
+        
+        <form id="transfer-wallet-form" method="post" action="{% url 'process_wallet_action' %}">
+            {% csrf_token %}
+            <input type="hidden" name="transaction_type" value="transfer">
+            
+            <div class="form-group">
+                <label for="id_transfer-amount">Amount (₦)</label> {# Changed ID to match convention #}
+                <input type="number" id="id_transfer-amount" name="amount" 
+                        min="100" max="{{ wallet.balance|floatformat:0 }}" required> {# Use 'wallet' from context #}
+                <span class="form-note">Available: ₦{{ wallet.balance|intcomma }}</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="recipient-search">Recipient</label>
+                <div class="recipient-selector">
+                    <input type="text" id="recipient-search" placeholder="Search by username, email or phone">
+                    {# This hidden input will be populated by JavaScript #}
+                    <input type="hidden" id="recipient-identifier" name="recipient_identifier">
+                    <div class="recipient-options">
+                        {# Displaying frequent contacts or search results dynamically #}
+                        {# You need to pass 'frequent_contacts' from your wallet_view context #}
+                        {% for contact in frequent_contacts %}
+                        {# data-recipient-value should be what your backend expects for recipient_identifier (e.g., username or email) #}
+                        <div class="recipient-option" data-recipient-value="{{ contact.username }}" data-recipient-full-name="{{ contact.get_full_name|default:contact.username }}">
+                            <img src="{% static 'images/default-avatar.png' %}" alt="{{ contact.username }}">
+                            <span>{{ contact.username }}</span>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted">No frequent contacts found.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="id_transfer-note">Note (Optional)</label> {# Changed ID to match convention #}
+                <input type="text" id="id_transfer-note" name="note" placeholder="What's this for?">
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block">
+                <i class="fas fa-paper-plane"></i> Send Money
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/wallet.js' %}"></script>
+{% endblock %}

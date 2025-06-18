@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/gen.css' %}">
+<link rel="stylesheet" href="{% static 'css/profile.css' %}">
+
+{% block title %}My Profile | Cooperative Savings{% endblock %}
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/profile.css' %}">
+    <script src="{% static 'js/profile.js' %}" defer></script>
+    <script src="{% static 'js/dashboard.js' %}"></script>
+    <script src="{% static 'js/script.js' %}"></script>
+{% endblock %}
+{% block content %}
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Profile Section -->
+        <main class="profile-container animate__animated animate__fadeIn">
+            <div class="container">
+                <!-- Profile Header -->
+                <section class="profile-header">
+                    <div class="profile-avatar">
+                        <div class="avatar-wrapper">
+                            <img src="{% if user.profile.profile_picture %}{{ user.profile.profile_picture.url }}{% else %}{% static 'images/default-avatar.png' %}{% endif %}" 
+                                 alt="Profile Picture" id="profile-picture">
+                            <button class="btn-upload" onclick="document.getElementById('upload-photo').click()">
+                                <i class="fas fa-camera"></i>
+                            </button>
+                            <input type="file" id="upload-photo" accept="image/*" style="display: none;">
+                        </div>
+                        <div class="profile-info">
+                            <h1>{{ user.get_full_name|default:user.email }}</h1>
+                            <p class="profile-email">
+                                <i class="fas fa-envelope"></i> {{ user.email }}
+                            </p>
+                            <p class="profile-phone">
+                                <i class="fas fa-phone"></i> {{ user.phone_number|default:"Not provided" }}
+                            </p>
+                            <div class="profile-stats">
+                                <div class="stat-item">
+                                    <i class="fas fa-users"></i>
+                                    <span>5 Groups</span>
+                                </div>
+                                <div class="stat-item">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    <span>Member since {{ user.date_joined|date:"M Y" }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="profile-actions">
+                        <button class="btn btn-primary">
+                            <i class="fas fa-share-alt"></i> Share Profile
+                        </button>
+                        <button class="btn btn-secondary">
+                            <i class="fas fa-qrcode"></i> QR Code
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Profile Tabs -->
+                <section class="profile-tabs">
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="personal">
+                            <i class="fas fa-user"></i> Personal Info
+                        </button>
+                        <button class="tab-btn" data-tab="security">
+                            <i class="fas fa-lock"></i> Security
+                        </button>
+                        <button class="tab-btn" data-tab="preferences">
+                            <i class="fas fa-cog"></i> Preferences
+                        </button>
+                    </div>
+
+                    <!-- Personal Info Tab -->
+                    <div class="tab-content active" id="personal-tab">
+                        <form class="profile-form" method="post" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label><i class="fas fa-id-card"></i> First Name</label>
+                                    <input type="text" name="first_name" value="{{ user.first_name }}">
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-id-card"></i> Last Name</label>
+                                    <input type="text" name="last_name" value="{{ user.last_name }}">
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-birthday-cake"></i> Date of Birth</label>
+                                    <input type="date" name="date_of_birth"
+                                           value="{{ user.profile.date_of_birth|date:'Y-m-d' }}">
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-venus-mars"></i> Gender</label>
+                                    <select name="gender">
+                                        {% for value, label in GENDER_CHOICES %}
+                                            <option value="{{ value }}"
+                                                {% if user.profile.gender == value %}selected{% endif %}>
+                                                {{ label }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-id-badge"></i> BVN</label>
+                                    <div class="input-with-icon">
+                                        <input type="text" name="bvn" value="{{ user.profile.bvn }}"
+                                               placeholder="11-digit BVN" maxlength="11">
+                                        <i class="fas fa-info-circle tooltip" data-tooltip="Used for identity verification"></i>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-passport"></i> NIN</label>
+                                    <div class="input-with-icon">
+                                        <input type="text" name="nin" value="{{ user.profile.nin }}"
+                                               placeholder="11-digit NIN" maxlength="11">
+                                        <i class="fas fa-info-circle tooltip" data-tooltip="National Identity Number"></i>
+                                    </div>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label><i class="fas fa-map-marker-alt"></i> Address</label>
+                                    <textarea name="address">{{ user.profile.address }}</textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-city"></i> City</label>
+                                    <input type="text" name="city" value="{{ user.profile.city }}">
+                                </div>
+                                <div class="form-group">
+                                    <label><i class="fas fa-flag"></i> State</label>
+                                    <input type="text" name="state" value="{{ user.profile.state }}">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-save">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Security Tab -->
+                    <div class="tab-content" id="security-tab">
+                        <div class="security-settings">
+                            <div class="security-item card">
+                                <div class="card-header">
+                                    <i class="fas fa-lock"></i>
+                                    <h3>Change Password</h3>
+                                </div>
+                                <form class="password-form">
+                                    <div class="form-group">
+                                        <label><i class="fas fa-key"></i> Current Password</label>
+                                        <div class="input-with-icon">
+                                            <input type="password" name="current_password" id="current-password">
+                                            <i class="fas fa-eye toggle-password" data-target="current-password"></i>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><i class="fas fa-key"></i> New Password</label>
+                                        <div class="input-with-icon">
+                                            <input type="password" name="new_password" id="new-password">
+                                            <i class="fas fa-eye toggle-password" data-target="new-password"></i>
+                                        </div>
+                                        <div class="password-strength">
+                                            <span class="strength-bar"></span>
+                                            <span class="strength-bar"></span>
+                                            <span class="strength-bar"></span>
+                                            <span class="strength-text">Weak</span>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><i class="fas fa-key"></i> Confirm New Password</label>
+                                        <div class="input-with-icon">
+                                            <input type="password" name="confirm_password" id="confirm-password">
+                                            <i class="fas fa-eye toggle-password" data-target="confirm-password"></i>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-save">
+                                        <i class="fas fa-save"></i> Update Password
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div class="security-item card">
+                                <div class="card-header">
+                                    <i class="fas fa-shield-alt"></i>
+                                    <h3>Two-Factor Authentication</h3>
+                                </div>
+                                <div class="toggle-item">
+                                    <div class="toggle-info">
+                                        <i class="fas fa-mobile-alt"></i>
+                                        <div>
+                                            <h4>SMS Authentication</h4>
+                                            <p>Receive OTP via SMS for login</p>
+                                        </div>
+                                    </div>
+                                    <div class="toggle-switch">
+                                        <label>
+                                            <input type="checkbox" {% if user.profile.two_factor_enabled %}checked{% endif %}>
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="toggle-item">
+                                    <div class="toggle-info">
+                                        <i class="fas fa-envelope"></i>
+                                        <div>
+                                            <h4>Email Authentication</h4>
+                                            <p>Receive OTP via Email for login</p>
+                                        </div>
+                                    </div>
+                                    <div class="toggle-switch">
+                                        <label>
+                                            <input type="checkbox" {% if user.profile.two_factor_email %}checked{% endif %}>
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="security-item card">
+                                <div class="card-header">
+                                    <i class="fas fa-list"></i>
+                                    <h3>Active Sessions</h3>
+                                </div>
+                                <div class="session-list">
+                                    <div class="session-item current">
+                                        <div class="session-icon">
+                                            <i class="fas fa-desktop"></i>
+                                        </div>
+                                        <div class="session-details">
+                                            <h4>Current Session</h4>
+                                            <p>Chrome on Windows 10</p>
+                                            <small>Last active: Just now</small>
+                                        </div>
+                                    </div>
+                                    <div class="session-item">
+                                        <div class="session-icon">
+                                            <i class="fas fa-mobile-alt"></i>
+                                        </div>
+                                        <div class="session-details">
+                                            <h4>Safari on iPhone</h4>
+                                            <p>iOS 15.4</p>
+                                            <small>Last active: 2 days ago</small>
+                                        </div>
+                                        <button class="btn btn-danger btn-sm">
+                                            <i class="fas fa-sign-out-alt"></i> Logout
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Preferences Tab -->
+                    <div class="tab-content" id="preferences-tab">
+                        <div class="preferences-settings">
+                            <div class="preference-item card">
+                                <div class="card-header">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                    <h3>Currency Preferences</h3>
+                                </div>
+                                <form class="preferences-form">
+                                    <div class="form-group">
+                                        <label><i class="fas fa-globe"></i> Preferred Currency</label>
+                                        <select name="preferred_currency">
+                                            <option value="NGN" {% if user.profile.preferred_currency == 'NGN' %}selected{% endif %}>
+                                                <i class="fas fa-naira-sign"></i> Naira (NGN)
+                                            </option>
+                                            <option value="USD" {% if user.profile.preferred_currency == 'USD' %}selected{% endif %}>
+                                                <i class="fas fa-dollar-sign"></i> Dollar (USD)
+                                            </option>
+                                        </select>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <div class="preference-item card">
+                                <div class="card-header">
+                                    <i class="fas fa-bell"></i>
+                                    <h3>Notification Preferences</h3>
+                                </div>
+                                <form class="preferences-form">
+                                    <div class="form-group">
+                                        <label>Notification Methods</label>
+                                        <div class="checkbox-group">
+                                            <label class="checkbox-item">
+                                                <input type="checkbox" name="email_notifications" checked>
+                                                <span class="checkmark"></span>
+                                                <i class="fas fa-envelope"></i> Email Notifications
+                                            </label>
+                                            <label class="checkbox-item">
+                                                <input type="checkbox" name="sms_notifications" checked>
+                                                <span class="checkmark"></span>
+                                                <i class="fas fa-sms"></i> SMS Notifications
+                                            </label>
+                                            <label class="checkbox-item">
+                                                <input type="checkbox" name="push_notifications" checked>
+                                                <span class="checkmark"></span>
+                                                <i class="fas fa-mobile-alt"></i> Push Notifications
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Notification Types</label>
+                                        <div class="checkbox-group">
+                                            <label class="checkbox-item">
+                                                <input type="checkbox" name="transaction_alerts" checked>
+                                                <span class="checkmark"></span>
+                                                <i class="fas fa-exchange-alt"></i> Transaction Alerts
+                                            </label>
+                                            <label class="checkbox-item">
+                                                <input type="checkbox" name="group_updates" checked>
+                                                <span class="checkmark"></span>
+                                                <i class="fas fa-users"></i> Group Updates
+                                            </label>
+                                            <label class="checkbox-item">
+                                                <input type="checkbox" name="promotions" checked>
+                                                <span class="checkmark"></span>
+                                                <i class="fas fa-bullhorn"></i> Promotions
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-save">
+                                        <i class="fas fa-save"></i> Save Preferences
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div class="preference-item card">
+                                <div class="card-header">
+                                    <i class="fas fa-palette"></i>
+                                    <h3>Theme Preferences</h3>
+                                </div>
+                                <div class="theme-options">
+                                    <div class="theme-option" data-theme="light">
+                                        <div class="theme-preview light-theme">
+                                            <div class="theme-header"></div>
+                                            <div class="theme-content"></div>
+                                        </div>
+                                        <span>Light Mode</span>
+                                    </div>
+                                    <div class="theme-option" data-theme="dark">
+                                        <div class="theme-preview dark-theme">
+                                            <div class="theme-header"></div>
+                                            <div class="theme-content"></div>
+                                        </div>
+                                        <span>Dark Mode</span>
+                                    </div>
+                                    <div class="theme-option" data-theme="system">
+                                        <div class="theme-preview system-theme">
+                                            <i class="fas fa-desktop"></i>
+                                        </div>
+                                        <span>System Default</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+{% endblock %}

@@ -1,0 +1,196 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Cooperative Savings{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'css/profile.css' %}">
+    <link rel="stylesheet" href="{% static 'css/gen.css' %}">
+    {% block extra_css %}{% endblock %} {# Placeholder for page-specific CSS #}
+</head>
+<body>
+    <header class="top-nav">
+        <div class="container">
+            <button class="menu-toggle" id="mobile-menu-toggle"> {# Added ID for JS #}
+                <i class="fas fa-bars"></i>
+            </button>
+            <a href="{% url 'dashboard_view' %}" class="logo"> {# Assuming 'dashboard' is the name for your dashboard URL #}
+                <img src="{% static 'images/logo.png' %}" alt="Cooperative Savings Logo">
+            </a>
+            <div class="nav-right">
+                <button class="theme-toggle">
+                    <i class="fas fa-moon"></i>
+                    <i class="fas fa-sun"></i>
+                </button>
+                <div class="notification-bell">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-count">3</span>
+                    <div class="notification-dropdown">
+                        <div class="notification-header">
+                            <h4>Notifications</h4>
+                            <a href="#">Mark all as read</a>
+                        </div>
+                        <div class="notification-list">
+                            <a href="#" class="notification-item unread">
+                                <div class="notification-icon">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <div class="notification-content">
+                                    <p>New contribution received in <strong>Market Women Group</strong></p>
+                                    <small>10 minutes ago</small>
+                                </div>
+                            </a>
+                            <a href="#" class="notification-item unread">
+                                <div class="notification-icon">
+                                    <i class="fas fa-calendar-check"></i>
+                                </div>
+                                <div class="notification-content">
+                                    <p>Your payout is scheduled for <strong>Friday</strong></p>
+                                    <small>2 hours ago</small>
+                                </div>
+                            </a>
+                            <a href="#" class="notification-item">
+                                <div class="notification-icon">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div class="notification-content">
+                                    <p>Your payment to <strong>Family Savings</strong> was successful</p>
+                                    <small>Yesterday</small>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="notification-footer">
+                            <a href="#">View all notifications</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="user-avatar">
+                    <img src="{% if user.userprofile.profile_picture %}{{ user.userprofile.profile_picture.url }}{% else %}{% static 'images/default-avatar.png' %}{% endif %}"
+                         alt="Profile Picture">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="sidenav-overlay"></div>
+    <aside class="sidenav" id="mySidenav"> {# Added ID for JS #}
+        <div class="sidenav-header">
+            <div class="user-profile">
+                <img src="{% if user.userprofile.profile_picture %}{{ user.userprofile.profile_picture.url }}{% else %}{% static 'images/default-avatar.png' %}{% endif %}"
+                     alt="Profile Picture" class="profile-img">
+                <div class="user-info">
+                    <h4>{{ user.get_full_name|default:user.email }}</h4>
+                    <span class="badge verified">
+                        <i class="fas fa-check-circle"></i> Verified
+                    </span>
+                </div>
+            </div>
+            <button class="close-sidenav" id="close-sidenav-btn"><i class="fas fa-times"></i></button> {# Added ID for JS #}
+        </div>
+        <nav class="sidenav-menu">
+            <ul>
+                <li>
+                    <a href="{% url 'dashboard_view' %}"> {# Updated to 'dashboard' #}
+                        <i class="fas fa-home"></i> Dashboard
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'group_list_view' %}">
+                        <i class="fas fa-users"></i> My Groups
+                    </a>
+                </li>
+                <li>
+                    <a href="#">
+                        <i class="fas fa-exchange-alt"></i> Transactions
+                    </a>
+                </li>
+                <li class="active"> {# This 'active' class would usually be set dynamically based on current page #}
+                    <a href="{% url 'profile_view' %}"> {# Updated to 'profile' #}
+                        <i class="fas fa-user-circle"></i> Profile
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url "wallet_view" %}">
+                        <i class="fas fa-wallet"></i> Wallet
+                    </a>
+                </li>
+                <li>
+                    <a href="#">
+                        <i class="fas fa-cog"></i> Settings
+                    </a>
+                </li>
+                <li>
+                    <a href="{% url 'logout' %}">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="content"> {# Added main tag for content area #}
+        {% block content %}{% endblock %} {# This is where child templates will insert their content #}
+    </main>
+
+    <footer class="main-footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <img src="{% static 'images/logo-white.png' %}" alt="Cooperative Savings Logo">
+                    <p>Digital Ajo/Esusu for smarter savings</p>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-linkedin-in"></i></a>
+                    </div>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>Product</h4>
+                        <a href="#">Features</a>
+                        <a href="#">Pricing</a>
+                        <a href="#">FAQ</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Company</h4>
+                        <a href="#">About Us</a>
+                        <a href="#">Blog</a>
+                        <a href="#">Careers</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Legal</h4>
+                        <a href="#">Terms</a>
+                        <a href="#">Privacy</a>
+                        <a href="#">Security</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2023 Cooperative Savings. All rights reserved.</p>
+                <div class="footer-apps">
+                    <a href="#" class="app-badge">
+                        <i class="fab fa-apple"></i> App Store
+                    </a>
+                    <a href="#" class="app-badge">
+                        <i class="fab fa-google-play"></i> Google Play
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="{% static 'js/scripts.js' %}"></script> {# Global JS for toggles, etc. #}
+    <script src="{% static 'js/dashboard.js' %}"></script>
+    <script src="{% static 'js/profile.js' %}"></script>
+    <script src="{% static 'js/script.js' %}"></script>
+    {% block extra_js %}{% endblock %} {# Placeholder for page-specific JS #}
+</body>
+</html>

@@ -1,0 +1,223 @@
+Admin
+mail : admin@admin.com
+username : Admin001
+pass : admin*001#
+
+
+
+password001
+
+1. user1 : user1@user.com : user1@123
+
+from core.models import CustomUser
+
+user = CustomUser.objects.create_user(
+    email='testuser@example.com',
+    username='testuser',  # This is still needed for AbstractUser
+    password='StrongPassword123!',
+    first_name='Test',
+    last_name='User',
+    phone_number='+2348012345678'
+)
+user.is_staff = False  # Set to True for admin access
+user.is_superuser = False # Set to True for superuser access
+user.save()
+
+print(f"User created: {user.email}")
+
+from core.models import UserProfile, CustomUser
+from datetime import date
+
+user = CustomUser.objects.get(email='testuser@example.com')  # Get the user you just created
+
+profile = UserProfile.objects.create(
+    user=user,
+    gender='male',
+    date_of_birth=date(1990, 1, 1),
+    bvn='12345678901',
+    nin='98765432109',
+    address='123 Main St',
+    city='Lagos',
+    state='Lagos',
+    lga='Ikeja',
+    country='Nigeria',
+    account_type='individual',
+    preferred_currency='NGN',
+    is_kyc_verified=True
+)
+
+print(f"Profile created for: {user.email}")
+
+
+from core.models import SavingsGroup, CustomUser
+from datetime import date
+
+creator = CustomUser.objects.get(email='testuser@example.com')  # Get the user to be the creator
+
+group = SavingsGroup.objects.create(
+    name='Ajo Group 1',
+    description='A weekly savings group',
+    creator=creator,
+    contribution_amount=5000.00,
+    contribution_frequency='weekly',
+    start_date=date(2025, 7, 1)
+)
+
+print(f"Savings group created: {group.name}")
+
+from core.models import SavingsGroup, CustomUser, GroupMembership
+
+group = SavingsGroup.objects.get(name='Ajo Group 1')
+user1 = CustomUser.objects.get(email='testuser@example.com')
+# Create another user to add as a member
+user2 = CustomUser.objects.create_user(email='member2@example.com', username='member2', password='Password123')
+
+# Add members to the group
+GroupMembership.objects.create(user=user1, group=group)
+GroupMembership.objects.create(user=user2, group=group)
+
+print(f"Added members to {group.name}")
+
+
+
+
+
+
+
+<div class="modal-overlay" id="fund-wallet-modal">
+            <div class="modal-content">
+                <button class="close-modal" id="close-fund-modal">&times;</button>
+                <h2><i class="fas fa-plus-circle"></i> Fund Wallet</h2>
+
+                <form id="fund-wallet-form" method="post" action="{% url 'process_wallet_action' %}"> {# <-- CHANGED URL NAME HERE #}
+                    {% csrf_token %}
+                    
+                    <input type="hidden" name="transaction_type" value="fund"> {# <-- ADDED THIS HIDDEN INPUT #}
+
+                    <div class="form-group">
+                        <label for="fund-amount">Amount (₦)</label>
+                        <input type="number" id="fund-amount" name="amount" min="100" required>
+                        <span class="form-note">Minimum: ₦100</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Payment Method</label>
+                        <div class="payment-options">
+                            <label class="payment-option">
+                                <input type="radio" name="payment_method" value="bank" checked>
+                                <div class="option-card">
+                                    <i class="fas fa-university"></i>
+                                    <h4>Bank Transfer</h4>
+                                </div>
+                            </label>
+                            <label class="payment-option">
+                                <input type="radio" name="payment_method" value="card">
+                                <div class="option-card">
+                                    <i class="fas fa-credit-card"></i>
+                                    <h4>Debit Card</h4>
+                                </div>
+                            </label>
+                            <label class="payment-option">
+                                <input type="radio" name="payment_method" value="ussd">
+                                <div class="option-card">
+                                    <i class="fas fa-mobile-alt"></i>
+                                    <h4>USSD</h4>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-arrow-right"></i> Proceed to Payment
+                    </button>
+                </form>
+            </div>
+        </div>
+
+    <!-- Withdraw Modal -->
+    <div class="modal-overlay" id="withdraw-wallet-modal">
+        <div class="modal-content">
+            <button class="close-modal" id="close-withdraw-modal">&times;</button>
+            <h2><i class="fas fa-arrow-up"></i> Withdraw Funds</h2>
+            
+            <form id="withdraw-wallet-form" method="post" action="{% url 'process_wallet_action' %}"> {# <-- CHANGED URL #}
+                {% csrf_token %}
+                <input type="hidden" name="transaction_type" value="withdraw"> {# <-- ADDED THIS #}
+                
+                <div class="form-group">
+                    <label for="withdraw-amount">Amount (₦)</label>
+                    <input type="number" id="withdraw-amount" name="amount" 
+                        min="500" max="{{ user.wallet.balance }}" required>
+                    <span class="form-note">Available: ₦{{ user.wallet.balance|intcomma }}</span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="bank-account">Bank Account</label>
+                    <select id="bank-account" name="bank_account" required>
+                        <option value="">Select Bank Account</option>
+                        {# You'll need to pass 'bank_accounts' from your wallet_view context #}
+                        {% for account in bank_accounts %} 
+                        <option value="{{ account.id }}">{{ account.bank_name }} - {{ account.account_number }}</option>
+                        {% endfor %}
+                    </select>
+                    <a href="#" class="add-bank-link">+ Add New Bank Account</a>
+                </div>
+                
+                <div class="form-group">
+                    <label for="withdraw-note">Note (Optional)</label>
+                    <textarea id="withdraw-note" name="note" rows="2" placeholder="Purpose of withdrawal"></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-paper-plane"></i> Request Withdrawal
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Transfer Modal -->
+    <div class="modal-overlay" id="transfer-wallet-modal">
+        <div class="modal-content">
+            <button class="close-modal" id="close-transfer-modal">&times;</button>
+            <h2><i class="fas fa-exchange-alt"></i> Transfer Funds</h2>
+            
+            <form id="transfer-wallet-form" method="post" action="{% url 'process_wallet_action' %}"> {# <-- CHANGED URL #}
+                {% csrf_token %}
+                <input type="hidden" name="transaction_type" value="transfer"> {# <-- ADDED THIS #}
+                
+                <div class="form-group">
+                    <label for="transfer-amount">Amount (₦)</label>
+                    <input type="number" id="transfer-amount" name="amount" 
+                        min="100" max="{{ user.wallet.balance }}" required>
+                    <span class="form-note">Available: ₦{{ user.wallet.balance|intcomma }}</span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="recipient">Recipient</label>
+                    <div class="recipient-selector">
+                        <input type="text" id="recipient-search" placeholder="Search by username, email or phone">
+                        {# This hidden input should hold the actual user ID or email for the backend #}
+                        <input type="hidden" id="recipient-identifier" name="recipient_identifier"> 
+                        <div class="recipient-options">
+                            {# You'll need to pass 'frequent_contacts' from your wallet_view context #}
+                            {% for contact in frequent_contacts %}
+                            <div class="recipient-option" data-recipient-value="{{ contact.username }}"> {# Or contact.email #}
+                                <img src="{% static 'images/default-avatar.png' %}" alt="{{ contact.username }}">
+                                <span>{{ contact.username }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="transfer-note">Note (Optional)</label>
+                    <input type="text" id="transfer-note" name="note" placeholder="What's this for?">
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-paper-plane"></i> Send Money
+                </button>
+            </form>
+        </div>
+    </div>

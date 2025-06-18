@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'css/profile.css' %}">
+<link rel="stylesheet" href="{% static 'css/styles.css' %}"> {# Ensure you have a global styles.css #}
+
+{% block title %}Dashboard | Cooperative Savings{% endblock %}
+
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+<script src="{% static 'js/dashboard.js' %}"></script>
+<script src="{% static 'js/profile.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Main Content -->
+    
+        <!-- Dashboard Content -->
+        <main class="dashboard-container animate__animated animate__fadeIn">
+            <div class="container">
+                <!-- Welcome Banner -->
+                <section class="welcome-banner">
+                    <div class="welcome-content">
+                        <h1>Welcome back, {{ user.first_name|default:"Member" }}!</h1>
+                        <p>Here's what's happening with your savings today</p>
+                        <button class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Create New Group
+                        </button>
+                    </div>
+                    <div class="welcome-image">
+                        <img src="{% static 'images/dashboard-banner.png' %}" alt="Savings Illustration">
+                    </div>
+                </section>
+
+                <!-- Quick Stats -->
+                <section class="quick-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-wallet"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Total Savings</h3>
+                            <h2>₦{{ total_savings }}</h2>
+                            <p class="{% if savings_percentage_change > 0 %}positive{% elif savings_percentage_change < 0 %}negative{% else %}neutral{% endif %}">
+                                <i class="fas fa-arrow-{% if savings_percentage_change > 0 %}up{% elif savings_percentage_change < 0 %}down{% else %}equals{% endif %}"></i> {{ savings_percentage_change|floatformat:2 }}% from last month
+                            </p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Active Groups</h3>
+                            <h2>{{ active_groups }}</h2>
+                            <p class="neutral">
+                                <i class="fas fa-equals"></i> Same as last month
+                            </p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-exchange-alt"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Transactions</h3>
+                            <h2>{{ total_transactions }}</h2>
+                            <p class="positive">
+                                <i class="fas fa-arrow-up"></i> 3 new today
+                            </p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3>Next Payout</h3>
+                            <h2>May 15</h2>
+                            <p class="negative">
+                                <i class="fas fa-clock"></i> 5 days remaining
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Charts Row -->
+                <section class="charts-row">
+                    <div class="chart-card main-chart">
+                        <div class="card-header">
+                            <h3>Savings Overview</h3>
+                            <select class="chart-period">
+                                <option>Last 7 Days</option>
+                                <option selected>Last 30 Days</option>
+                                <option>Last 90 Days</option>
+                                <option>This Year</option>
+                            </select>
+                        </div>
+                        <canvas id="savingsChart"></canvas>
+                    </div>
+                    <div class="chart-card pie-chart">
+                        <div class="card-header">
+                            <h3>Groups Distribution</h3>
+                        </div>
+                        <canvas id="groupsChart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Recent Activity -->
+                <section class="recent-activity">
+                    <div class="activity-card">
+                        <div class="card-header">
+                            <h3>Recent Transactions</h3>
+                            <a href="{#% url 'transactions' %}" class="btn btn-sm btn-secondary">
+                                View All <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                        <div class="activity-list">
+                            {% for transaction in recent_transactions %}
+                            <div class="activity-item">
+                                <div class="activity-icon {% if transaction.transaction_type == 'deposit' %}success{% elif transaction.transaction_type == 'withdrawal' %}primary{% else %}warning{% endif %}">
+                                    <i class="fas fa-arrow-{% if transaction.transaction_type == 'deposit' %}down{% elif transaction.transaction_type == 'withdrawal' %}up{% else %}exclamation{% endif %}"></i>
+                                </div>
+                                <div class="activity-content">
+                                    <h4>{{ transaction.get_transaction_type_display }}</h4>
+                                    <p>{{ transaction.description }}</p>
+                                </div>
+                                <div class="activity-amount">
+                                    {% if transaction.transaction_type == 'deposit' %}+{% else %}-{% endif %}₦{{ transaction.amount }}
+                                </div>
+                                <div class="activity-time">
+                                    {{ transaction.timestamp|timesince }} ago
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="activity-card">
+                        <div class="card-header">
+                            <h3>Upcoming Payouts</h3>
+                            <a href="{#% url 'groups' %}" class="btn btn-sm btn-secondary">
+                                View All <i class="fas fa-arrow-right"></i>
+                            </a>
+                        </div>
+                        <div class="activity-list">
+                            {% for group in upcoming_payouts %}
+                            <div class="activity-item">
+                                <div class="activity-icon info">
+                                    <i class="fas fa-calendar-day"></i>
+                                </div>
+                                <div class="activity-content">
+                                    <h4>{{ group.name }}</h4>
+                                    <p>Next payout: May 15, 2023</p>
+                                </div>
+                                <div class="activity-amount">
+                                    ₦75,000
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Savings Groups -->
+                <section class="savings-groups">
+                    <div class="section-header">
+                        <h2>Your Savings Groups</h2>
+                        <a href="{#% url 'groups' %}" class="btn btn-secondary">
+                            View All Groups <i class="fas fa-arrow-right"></i>
+                        </a>
+                    </div>
+                    <div class="groups-grid">
+                        {% for group in savings_groups %}
+                        <div class="group-card">
+                            <div class="group-header">
+                                <div class="group-icon">
+                                    <i class="fas fa-store"></i>
+                                </div>
+                                <h3>{{ group.name }}</h3>
+                                <span class="badge active">Active</span>
+                            </div>
+                            <div class="group-progress">
+                                <div class="progress-bar" style="width: 75%"></div>
+                                <div class="progress-info">
+                                    <span>₦75,000 of ₦100,000</span>
+                                    <span>75%</span>
+                                </div>
+                            </div>
+                            <div class="group-details">
+                                <div class="detail-item">
+                                    <i class="fas fa-users"></i>
+                                    <span>12 Members</span>
+                                </div>
+                                <div class="detail-item">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    <span>Weekly</span>
+                                </div>
+                                <div class="detail-item">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                    <span>₦5,000</span>
+                                </div>
+                            </div>
+                            <div class="group-actions">
+                                <button class="btn btn-sm btn-primary">
+                                    <i class="fas fa-eye"></i> View
+                                </button>
+                                <button class="btn btn-sm btn-secondary">
+                                    <i class="fas fa-share-alt"></i> Invite
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+            </div>
+        </main>
+
+{% endblock %}

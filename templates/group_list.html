@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}My Groups | Cooperative Savings{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/groups.css' %}">
+{% endblock %}
+
+{% block breadcrumb_items %}
+<i class="fas fa-chevron-right"></i>
+<span>My Groups</span>
+{% endblock %}
+
+{% block content %}
+<div class="groups-container">
+    <div class="container">
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="groups-header">
+            <h1><i class="fas fa-users"></i> My Savings Groups</h1>
+            <button class="btn btn-primary" id="create-group-btn">
+                <i class="fas fa-plus"></i> Create New Group
+            </button>
+        </div>
+
+        <div class="groups-tabs">
+            <button class="tab-btn active" data-tab="my-groups">My Groups</button>
+            <button class="tab-btn" data-tab="discover">Discover Public Groups</button>
+            <button class="tab-btn" data-tab="invited">Invitations</button>
+        </div>
+
+        <div class="groups-grid active-tab-content" id="my-groups-content">
+            {% if my_groups %}
+                {% for group in my_groups %} {# CORRECTED: Loop over my_groups #}
+                <div class="group-card" data-status="{{ group.status }}" data-name="{{ group.name|lower }}">
+                    <div class="group-header">
+                        <div class="group-icon">
+                            {% if group.group_type == 'ajo' %}
+                                <i class="fas fa-rotate"></i>
+                            {% else %}
+                                <i class="fas fa-calendar-days"></i>
+                            {% endif %}
+                        </div>
+                        <h3>{{ group.name }}</h3>
+                        <span class="group-status {{ group.status }}">{{ group.status|capfirst }}</span> {# Using dynamic status #}
+                    </div>
+
+                    <div class="group-progress">
+                        <div class="progress-bar" style="width: {{ group.percent_complete }}%"></div>
+                        <div class="progress-info">
+                            <span>₦{{ group.current_amount|intcomma }} of ₦{{ group.target_amount|intcomma }}</span>
+                            <span>{{ group.percent_complete|floatformat:0 }}%</span>
+                        </div>
+                    </div>
+
+                    <div class="group-meta">
+                        <div class="meta-item">
+                            <i class="fas fa-users"></i>
+                            <span>{{ group.members.count }} Members</span>
+                        </div>
+                        <div class="meta-item">
+                            <i class="fas fa-calendar-alt"></i>
+                            <span>{{ group.get_contribution_frequency_display }}</span>
+                        </div>
+                        <div class="meta-item">
+                            <i class="fas fa-money-bill-wave"></i>
+                            <span>₦{{ group.contribution_amount|intcomma }}</span>
+                        </div>
+                    </div>
+
+                    <div class="group-dates">
+                        <div class="date-item">
+                            <span>Start Date</span>
+                            <strong>{{ group.start_date|date:"M d, Y" }}</strong>
+                        </div>
+                        <div class="date-item">
+                            <span>End Date</span>
+                            {# Assuming you have end_date calculation in your model or a property #}
+                            {# If not, this might need dynamic calculation based on members * frequency #}
+                            <strong>{% if group.end_date %}{{ group.end_date|date:"M d, Y" }}{% else %}N/A{% endif %}</strong>
+                        </div>
+                    </div>
+
+                    <div class="group-actions">
+                        <a href="{% url 'group_detail_view' group_id=group.id %}" class="btn btn-outline"> {# CORRECTED: Use group_detail_view and pk #}
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                        {% if group.status == 'active' %}
+                        <button class="btn btn-primary contribute-btn" data-group-id="{{ group.id }}">
+                            <i class="fas fa-hand-holding-usd"></i> Contribute
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-users-slash"></i>
+                    </div>
+                    <h3>No Groups Yet</h3>
+                    <p>You haven't joined or created any savings groups yet</p>
+                    <button class="btn btn-primary" id="create-group-btn-2">
+                        <i class="fas fa-plus"></i> Create Your First Group
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="discover-groups-section tab-content" id="discover-content" style="display: none;">
+            <h2><i class="fas fa-globe"></i> Discover Public Groups</h2>
+            <form method="get" action="{% url 'group_list_view' %}" class="search-form">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" name="search" placeholder="Search public groups..." value="{{ search_query|default:'' }}">
+                    <button type="submit" class="btn btn-sm btn-secondary">Search</button>
+                </div>
+            </form>
+
+            <div class="groups-grid">
+                {% if discoverable_groups %}
+                    {% for group in discoverable_groups %}
+                    <div class="group-card">
+                        <div class="group-header">
+                            <div class="group-icon">
+                                {% if group.group_type == 'ajo' %}
+                                    <i class="fas fa-rotate"></i>
+                                {% else %}
+                                    <i class="fas fa-calendar-days"></i>
+                                {% endif %}
+                            </div>
+                            <h3>{{ group.name }}</h3>
+                            <span class="group-status public">Public</span> {# All here are public #}
+                        </div>
+
+                        <p>{{ group.description|truncatechars:100 }}</p>
+                        
+                        <div class="group-meta">
+                            <div class="meta-item">
+                                <i class="fas fa-users"></i>
+                                <span>{{ group.members.count }} Members</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-money-bill-wave"></i>
+                                <span>₦{{ group.contribution_amount|intcomma }} ({{ group.get_contribution_frequency_display }})</span>
+                            </div>
+                        </div>
+                        
+                        <div class="group-actions">
+                            <a href="{% url 'group_detail_view' group_id=group.id %}" class="btn btn-outline">
+                                <i class="fas fa-eye"></i> View Details
+                            </a>
+                            <form action="{% url 'join_group' group_id=group.id %}" method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-door-open"></i> Join Group
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <i class="fas fa-search-dollar"></i>
+                        </div>
+                        <h3>No Public Groups Found</h3>
+                        <p>Try a different search term or create your own group!</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            {# Pagination for Discoverable Groups #}
+            <div class="pagination">
+                {% if discoverable_groups.has_previous %}
+                    <a href="?page={{ discoverable_groups.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="btn btn-outline-secondary">Previous</a>
+                {% endif %}
+                <span class="current-page">
+                    Page {{ discoverable_groups.number }} of {{ discoverable_groups.paginator.num_pages }}.
+                </span>
+                {% if discoverable_groups.has_next %}
+                    <a href="?page={{ discoverable_groups.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}" class="btn btn-outline-secondary">Next</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="invitations-section tab-content" id="invited-content" style="display: none;">
+            <h2><i class="fas fa-envelope"></i> Group Invitations</h2>
+            {% if invitations %}
+                <div class="invitations-grid">
+                    {% for invitation in invitations %}
+                    <div class="invitation-card">
+                        <div class="invitation-header">
+                            <h3>{{ invitation.group.name }}</h3>
+                            <span class="invitation-from">From: {{ invitation.invited_by.get_full_name }}</span>
+                        </div>
+                        <div class="invitation-details">
+                            <div class="detail-item">
+                                <i class="fas fa-users"></i>
+                                <span>{{ invitation.group.members.count }} Members</span>
+                            </div>
+                            <div class="detail-item">
+                                <i class="fas fa-money-bill-wave"></i>
+                                <span>₦{{ invitation.group.contribution_amount|intcomma }}</span>
+                            </div>
+                            <div class="detail-item">
+                                <i class="fas fa-calendar-times"></i>
+                                <span>Expires: {{ invitation.expires_at|date:"M d, Y" }}</span>
+                            </div>
+                        </div>
+                        <div class="invitation-actions">
+                            <form action="{% url 'decline_invitation' invitation.id %}" method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="fas fa-times"></i> Decline
+                                </button>
+                            </form>
+                            <form action="{% url 'accept_invitation' invitation.id %}" method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-check"></i> Accept
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-envelope-open-text"></i>
+                    </div>
+                    <h3>No Pending Invitations</h3>
+                    <p>You currently have no pending group invitations.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="create-group-modal">
+    <div class="modal-content">
+        <button class="close-modal" id="close-create-modal">&times;</button>
+        <h2>Create New Group</h2>
+        
+        <form id="create-group-form" method="post" action="{% url 'group_create_view' %}">
+            {% csrf_token %}
+            
+            {# Render Django form fields #}
+            {{ create_group_form.as_p }} 
+
+            <button type="submit" class="btn btn-primary btn-block">
+                <i class="fas fa-save"></i> Create Group
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="contribute-modal">
+    <div class="modal-content">
+        <button class="close-modal" id="close-contribute-modal">&times;</button>
+        <h2>Make Contribution</h2>
+        
+        <form id="contribute-form" method="post" action="{% url 'process_contribution' %}"> {# Assuming a new URL for contributions #}
+            {% csrf_token %}
+            <input type="hidden" id="contribute-group-id" name="group_id">
+            
+            <div class="form-group">
+                <label for="contribute-amount">Amount (₦)</label>
+                <input type="number" id="contribute-amount" name="amount" min="100" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Payment Method</label>
+                <div class="payment-options">
+                    <label class="payment-option">
+                        <input type="radio" name="payment_method" value="wallet" checked>
+                        <div class="option-card">
+                            <i class="fas fa-wallet"></i>
+                            <h4>Wallet Balance</h4>
+                            <p>Available: ₦{{ request.user.wallet.balance|intcomma }}</p> {# Access wallet balance via request.user #}
+                        </div>
+                    </label>
+                    <label class="payment-option">
+                        <input type="radio" name="payment_method" value="bank">
+                        <div class="option-card">
+                            <i class="fas fa-university"></i>
+                            <h4>Bank Transfer</h4>
+                        </div>
+                    </label>
+                    <label class="payment-option">
+                        <input type="radio" name="payment_method" value="card">
+                        <div class="option-card">
+                            <i class="fas fa-credit-card"></i>
+                            <h4>Debit Card</h4>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block">
+                <i class="fas fa-check-circle"></i> Confirm Payment
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle tab switching
+        const tabButtons = document.querySelectorAll('.groups-tabs .tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+
+                tabContents.forEach(content => content.style.display = 'none');
+                const targetTabId = this.dataset.tab + '-content';
+                document.getElementById(targetTabId).style.display = 'block';
+            });
+        });
+
+        // Open/Close Create Group Modal
+        const createGroupBtn = document.getElementById('create-group-btn');
+        const createGroupBtn2 = document.getElementById('create-group-btn-2'); // For empty state
+        const createGroupModal = document.getElementById('create-group-modal');
+        const closeCreateModalBtn = document.getElementById('close-create-modal');
+
+        function openCreateGroupModal() {
+            createGroupModal.style.display = 'flex';
+        }
+
+        createGroupBtn.addEventListener('click', openCreateGroupModal);
+        if (createGroupBtn2) { // Check if the element exists
+            createGroupBtn2.addEventListener('click', openCreateGroupModal);
+        }
+        closeCreateModalBtn.addEventListener('click', function() {
+            createGroupModal.style.display = 'none';
+        });
+        createGroupModal.addEventListener('click', function(e) {
+            if (e.target === createGroupModal) {
+                createGroupModal.style.display = 'none';
+            }
+        });
+
+        // Open/Close Contribute Modal
+        const contributeButtons = document.querySelectorAll('.contribute-btn');
+        const contributeModal = document.getElementById('contribute-modal');
+        const closeContributeModalBtn = document.getElementById('close-contribute-modal');
+        const contributeGroupIdInput = document.getElementById('contribute-group-id');
+
+        contributeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const groupId = this.dataset.groupId;
+                contributeGroupIdInput.value = groupId;
+                contributeModal.style.display = 'flex';
+            });
+        });
+
+        closeContributeModalBtn.addEventListener('click', function() {
+            contributeModal.style.display = 'none';
+        });
+        contributeModal.addEventListener('click', function(e) {
+            if (e.target === contributeModal) {
+                contributeModal.style.display = 'none';
+            }
+        });
+
+        // Handle client-side filtering for 'My Groups' section (if needed, but server-side search is better)
+        // Note: The primary search for 'Discover Public Groups' is now handled by the form submission.
+        // This client-side logic below is for the 'My Groups' grid, to filter within loaded content.
+        const groupSearchInput = document.getElementById('group-search');
+        const groupFilterSelect = document.getElementById('group-filter');
+        const myGroupsGrid = document.querySelector('#my-groups-content .groups-grid'); // Target only my groups
+
+        function filterMyGroups() {
+            const searchText = groupSearchInput.value.toLowerCase();
+            const filterStatus = groupFilterSelect.value;
+
+            myGroupsGrid.querySelectorAll('.group-card').forEach(card => {
+                const groupName = card.dataset.name;
+                const groupStatus = card.dataset.status;
+
+                const matchesSearch = groupName.includes(searchText);
+                const matchesFilter = filterStatus === 'all' || groupStatus === filterStatus;
+
+                if (matchesSearch && matchesFilter) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+        
+        // Removed groupSearchInput and groupFilterSelect as they are client-side only
+        // and conflict with the server-side filtering for discoverable groups.
+        // If you need client-side filtering for 'My Groups' specifically, 
+        // you'd need to re-implement it carefully to avoid conflicts with server-side logic.
+        // For now, the main search is for "Discover Public Groups" and is server-driven.
+
+
+        // Initial check for search query in URL to activate discover tab
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('search')) {
+            document.querySelector('.groups-tabs .tab-btn[data-tab="discover"]').click();
+        }
+    });
+</script>
+<script src="{% static 'js/groups.js' %}"></script> {# Keep your custom JS if it has other functionalities #}
+{% endblock %}

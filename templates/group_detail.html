@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}My Groups | Cooperative Savings{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/groups.css' %}">
+{% endblock %}
+
+{% block breadcrumb_items %}
+<i class="fas fa-chevron-right"></i>
+<span>My Groups</span>
+{% endblock %}
+
+{% block content %}
+<div class="groups-container">
+    <div class="container">
+        <!-- Groups Header with Create Button -->
+        <div class="groups-header">
+            <h1><i class="fas fa-users"></i> My Savings Groups</h1>
+            <button class="btn btn-primary" id="create-group-btn">
+                <i class="fas fa-plus"></i> Create New Group
+            </button>
+        </div>
+
+        <!-- Groups Filter and Search -->
+        <div class="groups-controls">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="group-search" placeholder="Search groups...">
+            </div>
+            <div class="filter-controls">
+                <select class="form-select" id="group-filter">
+                    <option value="all">All Groups</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                    <option value="invited">Invitations</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Groups Tabs -->
+        <div class="groups-tabs">
+            <button class="tab-btn active" data-tab="all">All Groups</button>
+            <button class="tab-btn" data-tab="active">Active</button>
+            <button class="tab-btn" data-tab="completed">Completed</button>
+            <button class="tab-btn" data-tab="invited">Invitations</button>
+        </div>
+
+        <!-- Groups Grid -->
+        <div class="groups-grid">
+            {% if my_groups %}
+                {% for group in groups %}
+                <div class="group-card" data-status="{{ group.status }}" data-search="{{ group.name|lower }}">
+                    <div class="group-header">
+                        <div class="group-icon">
+                            {% if group.group_type == 'ajo' %}
+                                <i class="fas fa-rotate"></i>
+                            {% else %}
+                                <i class="fas fa-calendar-days"></i>
+                            {% endif %}
+                        </div>
+                        <h3>{{ group.name }}</h3>
+                        <span class="group-status {{ group.status }}">{{ group.get_status_display }}</span>
+                    </div>
+                    
+                    <div class="group-progress">
+                        <div class="progress-bar" style="width: {{ group.percent_complete }}%"></div>
+                        <div class="progress-info">
+                            <span>₦{{ group.current_amount|intcomma }} of ₦{{ group.target_amount|intcomma }}</span>
+                            <span>{{ group.percent_complete|floatformat:0 }}%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="group-meta">
+                        <div class="meta-item">
+                            <i class="fas fa-users"></i>
+                            <span>{{ group.members.count }} Members</span>
+                        </div>
+                        <div class="meta-item">
+                            <i class="fas fa-calendar-alt"></i>
+                            <span>{{ group.get_contribution_frequency_display }}</span>
+                        </div>
+                        <div class="meta-item">
+                            <i class="fas fa-money-bill-wave"></i>
+                            <span>₦{{ group.contribution_amount|intcomma }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="group-dates">
+                        <div class="date-item">
+                            <span>Start Date</span>
+                            <strong>{{ group.start_date|date:"M d, Y" }}</strong>
+                        </div>
+                        <div class="date-item">
+                            <span>End Date</span>
+                            <strong>{{ group.end_date|date:"M d, Y" }}</strong>
+                        </div>
+                    </div>
+                    
+                    <div class="group-actions">
+                        <a href="{% url 'group_detail_view' group_id=group.id %}" class="btn btn-outline">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                        {% if group.status == 'active' %}
+                        <button class="btn btn-primary contribute-btn" data-group-id="{{ group.id }}">
+                            <i class="fas fa-hand-holding-usd"></i> Contribute
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-users-slash"></i>
+                    </div>
+                    <h3>No Groups Yet</h3>
+                    <p>You haven't joined or created any savings groups yet</p>
+                    <button class="btn btn-primary" id="create-group-btn-2">
+                        <i class="fas fa-plus"></i> Create Your First Group
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+
+        {# Add discoverable groups section if you want to show them #}
+        <h2 class="mt-4">Discover Public Groups</h2>
+        {% if discoverable_groups %}
+            <div class="row">
+                {% for group in discoverable_groups %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ group.name }}</h5>
+                                <p class="card-text">{{ group.description|truncatechars:100 }}</p>
+                                <p class="card-text"><small class="text-muted">Creator: {{ group.creator.username }}</small></p>
+                                <a href="{% url 'group_detail_view' group_id=group.id %}" class="btn btn-sm btn-success">View & Join</a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No public groups to discover at the moment.</p>
+        {% endif %}
+
+        <!-- Invitations Section -->
+        {% if invitations %}
+        <div class="invitations-section">
+            <h2><i class="fas fa-envelope"></i> Group Invitations</h2>
+            <div class="invitations-grid">
+                {% for invitation in invitations %}
+                <div class="invitation-card">
+                    <div class="invitation-header">
+                        <h3>{{ invitation.group.name }}</h3>
+                        {# BEFORE: <span class="invitation-from">From: {{ invitation.invited_by.get_full_name }}</span> #}
+                        {# AFTER: Use invitation.sender to get the user who sent it #}
+                        <span class="invitation-from">From: {{ invitation.sender.get_full_name }}</span>
+                    </div>
+                    <div class="invitation-details">
+                        <div class="detail-item">
+                            <i class="fas fa-users"></i>
+                            <span>{{ invitation.group.members.count }} Members</span>
+                        </div>
+                        <div class="detail-item">
+                            <i class="fas fa-money-bill-wave"></i>
+                            <span>₦{{ invitation.group.contribution_amount|intcomma }}</span>
+                        </div>
+                    </div>
+                    <div class="invitation-actions">
+                        <button class="btn btn-danger decline-btn" data-invitation-id="{{ invitation.id }}">
+                            <i class="fas fa-times"></i> Decline
+                        </button>
+                        <button class="btn btn-success accept-btn" data-invitation-id="{{ invitation.id }}">
+                            <i class="fas fa-check"></i> Accept
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Create Group Modal -->
+<div class="modal-overlay" id="create-group-modal">
+    <div class="modal-content">
+        <button class="close-modal" id="close-create-modal">&times;</button>
+        <h2>Create New Group</h2>
+        
+        <form id="create-group-form" method="post" action="{% url 'group_create_view' %}">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="group-name">Group Name</label>
+                <input type="text" id="group-name" name="name" required placeholder="E.g. Family Savings, Market Women">
+            </div>
+            
+            <div class="form-group">
+                <label for="group-type">Group Type</label>
+                <div class="type-options">
+                    <label class="type-option">
+                        <input type="radio" name="group_type" value="ajo" checked>
+                        <div class="option-card">
+                            <i class="fas fa-rotate"></i>
+                            <h4>Ajo (Rotating)</h4>
+                            <p>Members take turns receiving the pooled funds</p>
+                        </div>
+                    </label>
+                    <label class="type-option">
+                        <input type="radio" name="group_type" value="esusu">
+                        <div class="option-card">
+                            <i class="fas fa-calendar-days"></i>
+                            <h4>Esusu (Fixed)</h4>
+                            <p>Fixed savings with payout at the end</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="target-amount">Target Amount (₦)</label>
+                    <input type="number" id="target-amount" name="target_amount" min="1000" required>
+                </div>
+                <div class="form-group">
+                    <label for="contribution-amount">Contribution Amount (₦)</label>
+                    <input type="number" id="contribution-amount" name="contribution_amount" min="100" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="start-date">Start Date</label>
+                    <input type="date" id="start-date" name="start_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="frequency">Contribution Frequency</label>
+                    <select id="frequency" name="frequency" required>
+                        <option value="daily">Daily</option>
+                        <option value="weekly" selected>Weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="description">Group Description (Optional)</label>
+                <textarea id="description" name="description" rows="3"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>Invite Members (Optional)</label>
+                <div class="invite-members">
+                    <input type="text" id="member-search" placeholder="Search members...">
+                    <div class="member-list">
+                        <!-- Would be populated with AJAX in a real implementation -->
+                        <div class="member-item">
+                            <label>
+                                <input type="checkbox" name="members" value="1">
+                                <img src="{% static 'images/default-avatar.png' %}" alt="Member">
+                                <span>User One</span>
+                            </label>
+                        </div>
+                        <div class="member-item">
+                            <label>
+                                <input type="checkbox" name="members" value="2">
+                                <img src="{% static 'images/default-avatar.png' %}" alt="Member">
+                                <span>User Two</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block">
+                <i class="fas fa-save"></i> Create Group
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Contribute Modal -->
+<div class="modal-overlay" id="contribute-modal">
+    <div class="modal-content">
+        <button class="close-modal" id="close-contribute-modal">&times;</button>
+        <h2>Make Contribution</h2>
+        
+        <form id="contribute-form" method="post">
+            {% csrf_token %}
+            <input type="hidden" id="contribute-group-id" name="group_id">
+            
+            <div class="form-group">
+                <label for="contribute-amount">Amount (₦)</label>
+                <input type="number" id="contribute-amount" name="amount" min="100" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Payment Method</label>
+                <div class="payment-options">
+                    <label class="payment-option">
+                        <input type="radio" name="payment_method" value="wallet" checked>
+                        <div class="option-card">
+                            <i class="fas fa-wallet"></i>
+                            <h4>Wallet Balance</h4>
+                            <p>Available: ₦{{ user.wallet.balance|intcomma }}</p>
+                        </div>
+                    </label>
+                    <label class="payment-option">
+                        <input type="radio" name="payment_method" value="bank">
+                        <div class="option-card">
+                            <i class="fas fa-university"></i>
+                            <h4>Bank Transfer</h4>
+                        </div>
+                    </label>
+                    <label class="payment-option">
+                        <input type="radio" name="payment_method" value="card">
+                        <div class="option-card">
+                            <i class="fas fa-credit-card"></i>
+                            <h4>Debit Card</h4>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block">
+                <i class="fas fa-check-circle"></i> Confirm Payment
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/groups.js' %}"></script>
+{% endblock %}
