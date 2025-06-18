@@ -14,7 +14,7 @@ SECRET_KEY = 'django-insecure-e-i2&)1%g!&mpy)p(gcs5o6)4497klm(-8kwk-sk^ijr6a^vwg
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['community-finance-app.onrender.com', 'localhost']
 
 
 # Application definition
