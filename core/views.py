@@ -13,7 +13,7 @@ from django.db import transaction as db_transaction
 # Assuming forms are correctly defined and imported.
 from .forms import UserLoginForm # This might be from an 'accounts' app, ensure correct import path
 from core.forms import CustomUserCreationForm, UserProfileUpdateForm, SavingsGroupForm, FundWalletForm, WithdrawWalletForm, TransferWalletForm
-from core.models import UserProfile, SavingsGroup, GroupMembership, Transaction, Wallet, Invitation
+from core.models import UserProfile, SavingsGroup, GroupMembership, Transaction, Wallet, Invitation, BankAccount
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -128,7 +128,8 @@ def login_view(request):
     next_url = request.GET.get('next')
     return render(request, 'login.html', {'form': form, 'next': next_url})
 
-
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 @login_required # Ensures only logged-in users can access this view
 def logout_view(request):
     """
@@ -203,10 +204,11 @@ def wallet_view(request):
     # Get the last transaction for the summary card (already ordered by '-timestamp' above)
     last_transaction = transactions_list.first()
 
-    # Forms for wallet actions (passed to template for modals/includes)
-    fund_form = FundWalletForm()
-    withdraw_form = WithdrawWalletForm(user_wallet=user_wallet) # Pass user_wallet to form
-    transfer_form = TransferWalletForm(sender_user=request.user) # Pass sender_user to form
+    # --- Fetch user's bank accounts ---
+    user_bank_accounts = BankAccount.objects.filter(user=request.user).order_by('bank_name')
+
+    # You might want to pass frequent_contacts if you have that logic elsewhere
+    frequent_contacts = [] # Replace with actual logic if needed
 
     context = {
         'user': request.user,
@@ -215,116 +217,173 @@ def wallet_view(request):
         'last_transaction': last_transaction,
         'selected_type': transaction_type_filter,
         'selected_period': transaction_period_filter,
-        'fund_form': fund_form,
-        'withdraw_form': withdraw_form,
-        'transfer_form': transfer_form,
+        'bank_accounts': user_bank_accounts,
+        'frequent_contacts': frequent_contacts, # Pass this if your template expects it
     }
     return render(request, 'wallet.html', context)
 
+import json
+@login_required
+@require_POST
+def add_bank_account(request):
+    """
+    Handles AJAX submission for adding a new bank account.
+    """
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        try:
+            # Assuming JSON payload from the JS fetch request
+            data = json.loads(request.body)
+            bank_name = data.get('bank_name')
+            account_number = data.get('account_number')
+            account_name = data.get('account_name')
+
+            if not all([bank_name, account_number, account_name]):
+                return JsonResponse({'success': False, 'message': 'All bank account fields are required.'}, status=400)
+
+            # Create the new bank account
+            new_bank_account = BankAccount.objects.create(
+                user=request.user,
+                bank_name=bank_name,
+                account_number=account_number,
+                account_name=account_name
+                # Add any other required fields for your BankAccount model
+            )
+
+            return JsonResponse({
+                'success': True,
+                'message': 'Bank account added successfully!',
+                'new_account_id': new_bank_account.id # Send the new ID back for selection
+            })
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'message': 'Invalid JSON payload.'}, status=400)
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': f'An error occurred: {str(e)}'}, status=500)
+    return JsonResponse({'success': False, 'message': 'Invalid request method or not an AJAX request.'}, status=400)
+
 
 @login_required
+@require_POST
 def process_wallet_action(request):
-    if request.method == 'POST':
-        action_type = request.POST.get('transaction_type')
+    """
+    Handles funding, withdrawal, and transfer requests.
+    """
+    # Verify it's an AJAX request (good practice, though not strictly necessary for this specific error)
+    if not request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'success': False, 'message': 'Invalid request method or not an AJAX request.'}, status=400)
+
+    transaction_type = request.POST.get('transaction_type')
+    amount_str = request.POST.get('amount') # Get amount as a string from POST data
+    note = request.POST.get('note')
+
+    try:
+        # --- CRITICAL FIX: Convert amount_str to Decimal here ---
+        amount = Decimal(amount_str)
+        if amount <= 0:
+            return JsonResponse({'success': False, 'message': 'Amount must be positive.'}, status=400)
+    except (InvalidOperation, TypeError, ValueError): # Handle various conversion errors
+        return JsonResponse({'success': False, 'message': 'Invalid amount provided.'}, status=400)
+
+    try:
         user_wallet = get_object_or_404(Wallet, user=request.user)
 
-        if action_type == 'fund':
-            form = FundWalletForm(request.POST)
-            if form.is_valid():
-                amount = form.cleaned_data['amount']
-                payment_method = form.cleaned_data['payment_method']
+        if transaction_type == 'fund':
+            user_wallet.balance += amount
+            user_wallet.save()
+            Transaction.objects.create(
+                wallet=user_wallet,
+                transaction_type='deposit',
+                amount=amount,
+                status='completed',
+                description=note if note else 'Wallet funding'
+            )
+            return JsonResponse({'success': True, 'message': 'Wallet funded successfully.'})
 
-                with db_transaction.atomic():
-                    if user_wallet.fund(amount):
-                        Transaction.objects.create(
-                            wallet=user_wallet,
-                            amount=amount,
-                            transaction_type='deposit',
-                            status='completed',
-                            description=f"Funds added via {payment_method.replace('_', ' ').title()}"
-                        )
-                        messages.success(request, f"Successfully funded your wallet with ₦{amount:,.2f}.")
-                    else:
-                        messages.error(request, "Failed to fund wallet.")
-                return redirect(reverse('wallet_view'))
-            else:
-                for field, errors in form.errors.items():
-                    for error in errors:
-                        messages.error(request, f"Fund Wallet - {field}: {error}")
-                return redirect(reverse('wallet_view'))
+        elif transaction_type == 'withdraw':
+            if amount > user_wallet.balance:
+                return JsonResponse({'success': False, 'message': 'Insufficient balance.'}, status=400)
 
-        elif action_type == 'withdraw':
-            form = WithdrawWalletForm(request.POST, user_wallet=user_wallet)
-            if form.is_valid():
-                amount = form.cleaned_data['amount']
-                with db_transaction.atomic():
-                    if user_wallet.withdraw(amount):
-                        Transaction.objects.create(
-                            wallet=user_wallet,
-                            amount=amount,
-                            transaction_type='withdrawal',
-                            status='pending',
-                            description="Withdrawal to bank account"
-                        )
-                        messages.success(request, f"Withdrawal of ₦{amount:,.2f} initiated. It will be processed shortly.")
-                    else:
-                        messages.error(request, "Withdrawal failed. Check your balance.")
-                return redirect(reverse('wallet_view'))
-            else:
-                for field, errors in form.errors.items():
-                    for error in errors:
-                        messages.error(request, f"Withdrawal - {field}: {error}")
-                return redirect(reverse('wallet_view'))
+            bank_account_id = request.POST.get('bank_account')
 
-        elif action_type == 'transfer':
-            form = TransferWalletForm(request.POST, sender_user=request.user)
-            if form.is_valid():
-                amount = form.cleaned_data['amount']
-                recipient_user = form.cleaned_data['recipient_identifier']
+            if not bank_account_id:
+                return JsonResponse({'success': False, 'message': 'No bank account selected.'}, status=400)
 
-                with db_transaction.atomic():
-                    sender_wallet = request.user.wallet
-                    recipient_wallet, created = Wallet.objects.get_or_create(user=recipient_user) # Ensure recipient has a wallet
+            try:
+                # Ensure the selected bank account belongs to the user
+                selected_account = BankAccount.objects.get(id=bank_account_id, user=request.user)
+            except BankAccount.DoesNotExist:
+                return JsonResponse({'success': False, 'message': 'Invalid bank account selected.'}, status=400)
 
-                    if sender_wallet.withdraw(amount): # Deduct from sender
-                        recipient_wallet.fund(amount) # Add to recipient
+            user_wallet.balance -= amount # This line is now Decimal - Decimal
+            user_wallet.save()
+            Transaction.objects.create(
+                wallet=user_wallet,
+                transaction_type='withdrawal',
+                amount=amount,
+                status='pending',
+                description=note if note else f'Withdrawal to {selected_account.bank_name} - {selected_account.account_number}'
+            )
+            return JsonResponse({'success': True, 'message': 'Withdrawal request submitted successfully.'})
 
-                        # Create transaction for sender
-                        Transaction.objects.create(
-                            wallet=sender_wallet,
-                            amount=amount,
-                            transaction_type='transfer',
-                            status='completed',
-                            sender=request.user,
-                            recipient=recipient_user,
-                            description=f"Transfer to {recipient_user.get_full_name() or recipient_user.username}"
-                        )
-                        # Create transaction for recipient
-                        Transaction.objects.create(
-                            wallet=recipient_wallet,
-                            amount=amount,
-                            transaction_type='transfer',
-                            status='completed',
-                            sender=request.user,
-                            recipient=recipient_user,
-                            description=f"Received from {request.user.get_full_name() or request.user.username}"
-                        )
-                        messages.success(request, f"Successfully transferred ₦{amount:,.2f} to {recipient_user.get_full_name() or recipient_user.username}.")
-                    else:
-                        messages.error(request, "Transfer failed. Insufficient balance.")
-                return redirect(reverse('wallet_view'))
-            else:
-                for field, errors in form.errors.items():
-                    for error in errors:
-                        messages.error(request, f"Transfer - {field}: {error}")
-                return redirect(reverse('wallet_view'))
+        elif transaction_type == 'transfer':
+            if amount > user_wallet.balance:
+                return JsonResponse({'success': False, 'message': 'Insufficient balance.'}, status=400)
+
+            recipient_identifier = request.POST.get('recipient_identifier')
+            if not recipient_identifier:
+                return JsonResponse({'success': False, 'message': 'Recipient is required.'}, status=400)
+
+            try:
+                recipient_user = User.objects.get(Q(username=recipient_identifier) | Q(email=recipient_identifier))
+            except User.DoesNotExist:
+                return JsonResponse({'success': False, 'message': 'Recipient not found.'}, status=404)
+
+            if recipient_user == request.user:
+                return JsonResponse({'success': False, 'message': 'Cannot transfer to yourself.'}, status=400)
+
+            recipient_wallet, created = Wallet.objects.get_or_create(user=recipient_user)
+
+            user_wallet.balance -= amount
+            user_wallet.save()
+
+            recipient_wallet.balance += amount
+            recipient_wallet.save()
+
+            Transaction.objects.create(
+                wallet=user_wallet,
+                transaction_type='transfer',
+                amount=amount,
+                status='completed',
+                description=note if note else f'Transfer to {recipient_user.get_full_name() or recipient_user.username}',
+                sender=request.user,
+                recipient=recipient_user,
+            )
+            Transaction.objects.create(
+                wallet=recipient_wallet,
+                transaction_type='transfer',
+                amount=amount,
+                status='completed',
+                description=f'Received from {request.user.get_full_name() or request.user.username}' if not note else f'{note} (received)',
+                sender=request.user,
+                recipient=recipient_user,
+            )
+            return JsonResponse({'success': True, 'message': 'Funds transferred successfully.'})
 
         else:
-            messages.error(request, "Invalid wallet action.")
-            return redirect(reverse('wallet_view'))
-    else:
-        return redirect(reverse('wallet_view'))
+            return JsonResponse({'success': False, 'message': 'Invalid transaction type.'}, status=400)
 
+    except Exception as e:
+        print(f"Error in process_wallet_action: {e}")
+        return JsonResponse({'success': False, 'message': 'An unexpected error occurred during processing.'}, status=500)
+
+        
+
+@login_required
+def get_bank_accounts(request):
+    """
+    AJAX endpoint to return a user's bank accounts as JSON.
+    """
+    bank_accounts = BankAccount.objects.filter(user=request.user).values('id', 'bank_name', 'account_number', 'account_name')
+    return JsonResponse({'bank_accounts': list(bank_accounts)})
 
 ## Savings Group Views
 

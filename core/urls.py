@@ -18,6 +18,8 @@ urlpatterns = [
     # path('wallet/fund/', views.fund_wallet, name='fund_wallet'),
     # path('wallet/withdraw/', views.withdraw_wallet, name='withdraw_wallet'),
     # path('wallet/transfer/', views.transfer_funds, name='transfer_funds'),
+    path('add-bank-account/', views.add_bank_account, name='add_bank_account'),
+    path('get-bank-accounts/', views.get_bank_accounts, name='get_bank_accounts'),
 
     path('groups/', views.group_list_view, name='group_list_view'),
     path('groups/create/', views.group_create_view, name='group_create_view'),

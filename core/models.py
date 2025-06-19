@@ -4,11 +4,14 @@ from django.db import models
 from django.core.validators import RegexValidator
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
-from django.utils import timezone # Keep for potential future use, though auto_now/add handle current needs
-from django.db.models import Q # Keep for potential future query use
+from django.utils import timezone
+from django.db.models import Q
 from simple_history.models import HistoricalRecords
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from datetime import timedelta # Import timedelta for the Invitation expiry
+from django.conf import settings # Import settings for AUTH_USER_MODEL
+from decimal import Decimal
 
 # Define choices for Account Type and Gender
 ACCOUNT_TYPE_CHOICES = [
@@ -44,8 +47,8 @@ class CustomUser(AbstractUser):
     
     # Track user status (active/suspended)
     is_active = models.BooleanField(default=True, 
-                                    help_text="Designates whether this user should be treated as active. "
-                                              "Unselect this instead of deleting accounts.")
+                                     help_text="Designates whether this user should be treated as active. "
+                                               "Unselect this instead of deleting accounts.")
     is_suspended = models.BooleanField(default=False, 
                                        help_text="Designates whether the user's account has been suspended.")
     
@@ -81,8 +84,6 @@ class UserProfile(models.Model):
     date_of_birth = models.DateField(null=True, blank=True)
 
     # KYC Fields with validators
-    # Using CharField as per your latest snippet's structure, 
-    # but be aware that sensitive data might require encryption in production.
     bvn = models.CharField(
         max_length=11,
         unique=True,
@@ -120,7 +121,7 @@ class UserProfile(models.Model):
     # Verification & Metadata
     profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True)
     is_kyc_verified = models.BooleanField(default=False, 
-                                           help_text="Indicates if the user's KYC documents have been verified.")
+                                         help_text="Indicates if the user's KYC documents have been verified.")
     kyc_submitted_at = models.DateTimeField(null=True, blank=True)
     kyc_approved_at = models.DateTimeField(null=True, blank=True)
     
@@ -161,10 +162,10 @@ class SavingsGroup(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     target_amount = models.DecimalField(
-        max_digits=12,         # Adjust max_digits as per your expected maximum amount
-        decimal_places=2,      # Standard for currency
-        null=True,             # Allow groups without a fixed target
-        blank=True,            # Allow blank in forms
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
         help_text="The total target amount for the group (e.g., for Esusu or a target-based Ajo)"
     )
 
@@ -201,9 +202,7 @@ class GroupMembership(models.Model):
     def __str__(self):
         return f"{self.user.email} in {self.group.name}"
     
-from django.conf import settings
-from django.db.models.signals import post_save
-from decimal import Decimal
+
 class Wallet(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='wallet')
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00')) # Increased max_digits
@@ -230,9 +229,6 @@ class Wallet(models.Model):
         self.total_withdrawals += amount
         self.save()
         return True
-
-    # Note: For real-world use, these simple methods need to be wrapped in
-    # database transactions to ensure atomicity and data integrity.
 
 #======================= Invitation =====================================>
 class Invitation(models.Model):
@@ -324,15 +320,10 @@ class Invitation(models.Model):
         if self.status == 'pending' and not self.is_expired():
             # If recipient_email was used, find or create the user
             if self.recipient_email and not self.recipient:
-                # You'd need logic here to map the email to an existing user or
-                # prompt the user to register/login.
-                # For simplicity, if a user exists with that email, link them.
                 try:
                     self.recipient = CustomUser.objects.get(email=self.recipient_email)
                 except CustomUser.DoesNotExist:
                     # Handle case where user needs to register first.
-                    # For a real app, this would redirect to registration or pre-fill form.
-                    # For now, let's just not set recipient if not found.
                     pass
 
             if self.recipient: # Only add if we have a linked user account
@@ -352,7 +343,6 @@ class Invitation(models.Model):
             self.save()
             return True
         return False
-
 
 import uuid
 class Transaction(models.Model):
@@ -374,7 +364,7 @@ class Transaction(models.Model):
         'Wallet', # References the Wallet model defined in the same file
         on_delete=models.CASCADE,
         related_name='transactions',
-        default=0,
+        # default=0, # This default is incorrect for a ForeignKey field. Remove it.
         help_text="The wallet primarily associated with this transaction."
     )
     amount = models.DecimalField(max_digits=12, decimal_places=2)
@@ -437,10 +427,26 @@ class Transaction(models.Model):
     def save(self, *args, **kwargs):
         # Automatically generate a unique reference for completed transactions if not provided
         if not self.reference and self.status == 'completed':
-            # Generate a UUID and take the first 20 characters for brevity
-            # Consider a more robust reference generation for production if UUIDs aren't suitable
             self.reference = str(uuid.uuid4()).replace('-', '')[:20]
         super().save(*args, **kwargs)
+
+
+class BankAccount(models.Model):
+    # CHANGED: Use settings.AUTH_USER_MODEL for consistency with other models
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='bank_accounts') 
+    bank_name = models.CharField(max_length=100)
+    account_number = models.CharField(max_length=20) # Removed unique=True to allow same account number for different users
+    account_name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # ADDED: Unique constraint on user and account_number to prevent one user adding the same account twice
+        unique_together = ('user', 'account_number')
+        ordering = ['bank_name']
+
+    def __str__(self):
+        return f"{self.bank_name} - {self.account_number} ({self.user.email})"
+
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_user_profile(sender, instance, created, **kwargs):

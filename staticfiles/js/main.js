@@ -121,6 +121,40 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ------------------------------------
+    // 10. How It Works Steps Animation
+    // ------------------------------------
+    const animateSteps = () => {
+        const stepsContainer = document.querySelector('.steps-container');
+        if (!stepsContainer) return;
+
+        const stepCards = document.querySelectorAll('.step-card');
+        const windowHeight = window.innerHeight;
+        const containerTop = stepsContainer.getBoundingClientRect().top;
+        const containerBottom = stepsContainer.getBoundingClientRect().bottom;
+
+        // Only animate if container is in view
+        if (containerTop < windowHeight && containerBottom > 0) {
+            stepCards.forEach((card, index) => {
+                const cardTop = card.getBoundingClientRect().top;
+                
+                if (cardTop < windowHeight - 100) {
+                    const animation = card.getAttribute('data-animation');
+                    const delay = index * 200; // Staggered delay
+                    
+                    setTimeout(() => {
+                        card.style.opacity = '1';
+                        card.classList.add(animation);
+                    }, delay);
+                }
+            });
+        }
+    };
+
+    // Initialize on load and scroll
+    document.addEventListener('DOMContentLoaded', animateSteps);
+    window.addEventListener('scroll', animateSteps);
+
+    // ------------------------------------
     // 8. FAQ Accordion
     // ------------------------------------
     const faqQuestions = document.querySelectorAll('.faq-question');
