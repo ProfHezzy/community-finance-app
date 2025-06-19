@@ -1,270 +1,241 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Transaction Action Buttons
-    const actionButtons = document.querySelectorAll('[data-action]');
-    const transactionModal = document.getElementById('transaction-modal');
-    const closeModal = document.getElementById('close-modal');
-    const modalTitle = document.getElementById('modal-title');
-    const transactionForm = document.getElementById('transaction-form');
-    const transactionTypeInput = document.getElementById('transaction-type-input');
-    const recipientGroup = document.getElementById('recipient-group');
-    const submitText = document.getElementById('submit-text');
+    // --- State Management ---
+    let eventListeners = [];
     
-    // Filter Elements
-    const typeFilter = document.getElementById('transaction-type');
-    const periodFilter = document.getElementById('transaction-period');
-    const transactionItems = document.querySelectorAll('.transaction-item');
-    
-    // Open modal with appropriate form based on action
-    actionButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const action = this.getAttribute('data-action');
-            
-            switch(action) {
-                case 'fund':
-                    modalTitle.textContent = 'Fund Wallet';
-                    transactionTypeInput.value = 'deposit';
-                    recipientGroup.style.display = 'none';
-                    submitText.textContent = 'Proceed to Payment';
-                    break;
-                case 'withdraw':
-                    modalTitle.textContent = 'Withdraw Funds';
-                    transactionTypeInput.value = 'withdrawal';
-                    recipientGroup.style.display = 'none';
-                    submitText.textContent = 'Request Withdrawal';
-                    break;
-                case 'transfer':
-                    modalTitle.textContent = 'Transfer Funds';
-                    transactionTypeInput.value = 'transfer';
-                    recipientGroup.style.display = 'block';
-                    submitText.textContent = 'Send Money';
-                    break;
-            }
-            
-            transactionModal.classList.add('active');
+    // Cleanup function to remove all event listeners
+    function cleanup() {
+        eventListeners.forEach(({element, type, handler}) => {
+            element.removeEventListener(type, handler);
+        });
+        eventListeners = [];
+    }
+
+    // Helper to track event listeners for cleanup
+    function addListener(element, type, handler) {
+        element.addEventListener(type, handler);
+        eventListeners.push({element, type, handler});
+        return handler;
+    }
+
+    // --- Modal Elements ---
+    const fundWalletModal = document.getElementById('fund-wallet-modal');
+    const withdrawWalletModal = document.getElementById('withdraw-wallet-modal');
+    const transferWalletModal = document.getElementById('transfer-wallet-modal');
+
+    // --- Modal Management ---
+    function setupModalToggle(openBtnId, modal) {
+        const openBtn = document.getElementById(openBtnId);
+        if (!openBtn) return;
+
+        const handler = () => {
+            modal.classList.add('active');
             document.body.style.overflow = 'hidden';
+        };
+        addListener(openBtn, 'click', handler);
+    }
+
+    // Initialize all modals
+    setupModalToggle('fund-wallet-btn', fundWalletModal);
+    setupModalToggle('fund-wallet-btn-2', fundWalletModal);
+    setupModalToggle('withdraw-wallet-btn', withdrawWalletModal);
+    setupModalToggle('transfer-wallet-btn', transferWalletModal);
+
+    // Close modal handlers
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+        // Close button
+        const closeBtn = modal.querySelector('.close-modal');
+        if (closeBtn) {
+            addListener(closeBtn, 'click', () => {
+                modal.classList.remove('active');
+                document.body.style.overflow = 'auto';
+            });
+        }
+
+        // Close when clicking outside
+        addListener(modal, 'click', function(e) {
+            if (e.target === this) {
+                this.classList.remove('active');
+                document.body.style.overflow = 'auto';
+            }
         });
     });
-    
-    // Close modal
-    closeModal.addEventListener('click', function() {
-        transactionModal.classList.remove('active');
-        document.body.style.overflow = 'auto';
-    });
-    
-    // Close modal when clicking outside
-    transactionModal.addEventListener('click', function(e) {
-        if (e.target === transactionModal) {
-            transactionModal.classList.remove('active');
-            document.body.style.overflow = 'auto';
+
+    // --- Recipient Search and Selection ---
+    const recipientIdentifier = document.getElementById('recipient-identifier');
+    const recipientSearch = document.getElementById('recipient-search');
+    const recipientOptionsContainer = document.querySelector('.recipient-options');
+
+    if (recipientSearch && recipientOptionsContainer) {
+        // Store initial options
+        const initialRecipientOptions = Array.from(recipientOptionsContainer.querySelectorAll('.recipient-option'));
+
+        // Click handler for recipient options
+        function handleRecipientClick(e) {
+            const option = e.currentTarget;
+            const value = option.getAttribute('data-recipient-value');
+            const fullName = option.querySelector('span').textContent;
+            
+            recipientIdentifier.value = value;
+            recipientSearch.value = fullName;
+            
+            // Update UI
+            initialRecipientOptions.forEach(opt => opt.classList.remove('selected'));
+            option.classList.add('selected');
+            recipientOptionsContainer.style.display = 'none';
         }
-    });
-    
-    // Filter transactions
+
+        // Initialize options
+        initialRecipientOptions.forEach(option => {
+            addListener(option, 'click', handleRecipientClick);
+        });
+
+        // Search functionality
+        addListener(recipientSearch, 'input', function() {
+            const query = this.value.toLowerCase().trim();
+            
+            if (query.length > 2) {
+                // Client-side filtering
+                initialRecipientOptions.forEach(option => {
+                    const name = option.querySelector('span').textContent.toLowerCase();
+                    option.style.display = name.includes(query) ? 'flex' : 'none';
+                });
+                recipientOptionsContainer.style.display = 'block';
+            } else {
+                // Reset to initial state
+                initialRecipientOptions.forEach(option => {
+                    option.style.display = 'flex';
+                });
+            }
+        });
+
+        // Show options on focus
+        addListener(recipientSearch, 'focus', () => {
+            recipientOptionsContainer.style.display = 'block';
+        });
+
+        // Hide options when clicking outside
+        addListener(document, 'click', (e) => {
+            if (!e.target.closest('.recipient-selector')) {
+                recipientOptionsContainer.style.display = 'none';
+            }
+        });
+    }
+
+    // --- Form Handling ---
+    function handleWalletForm(formId, successMessage) {
+        const form = document.getElementById(formId);
+        if (!form) return;
+
+        addListener(form, 'submit', async function(e) {
+            e.preventDefault();
+
+            // Validate form
+            const amountInput = form.querySelector('input[name="amount"]');
+            if (amountInput) {
+                const amount = parseFloat(amountInput.value);
+                const minAmount = parseFloat(amountInput.min);
+                const maxAmount = parseFloat(amountInput.max);
+
+                if (isNaN(amount) {
+                    alert('Please enter a valid amount');
+                    return;
+                }
+
+                if (amount < minAmount) {
+                    alert(`Minimum amount is ₦${minAmount}`);
+                    return;
+                }
+
+                if (formId !== 'fund-wallet-form' && amount > maxAmount) {
+                    alert(`Amount cannot exceed ₦${maxAmount}`);
+                    return;
+                }
+            }
+
+            if (formId === 'transfer-wallet-form' && !recipientIdentifier.value) {
+                alert('Please select a recipient');
+                return;
+            }
+
+            // Disable button during submission
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
+            try {
+                const formData = new FormData(form);
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(successMessage);
+                    document.getElementById(formId.replace('-form', '-modal')).classList.remove('active');
+                    document.body.style.overflow = 'auto';
+                    window.location.reload();
+                } else {
+                    throw new Error(data.message || 'Transaction failed');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert(error.message || 'An error occurred. Please try again.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        });
+    }
+
+    // Initialize form handlers
+    handleWalletForm('fund-wallet-form', 'Wallet funded successfully!');
+    handleWalletForm('withdraw-wallet-form', 'Withdrawal request submitted!');
+    handleWalletForm('transfer-wallet-form', 'Transfer completed successfully!');
+
+    // --- Transaction Filtering ---
+    const transactionTypeFilter = document.getElementById('transaction-type');
+    const transactionPeriodFilter = document.getElementById('transaction-period');
+    const transactionItems = document.querySelectorAll('.transaction-item');
+
     function filterTransactions() {
-        const typeValue = typeFilter.value;
-        const periodValue = periodFilter.value;
+        const typeValue = transactionTypeFilter.value;
+        const periodValue = transactionPeriodFilter.value;
         const now = new Date();
-        let periodDate = new Date();
-        
-        // Calculate period date
-        switch(periodValue) {
-            case '7days':
-                periodDate.setDate(now.getDate() - 7);
-                break;
-            case '30days':
-                periodDate.setDate(now.getDate() - 30);
-                break;
-            case '90days':
-                periodDate.setDate(now.getDate() - 90);
-                break;
-            case 'all':
-                periodDate = null;
-                break;
-        }
-        
+
         transactionItems.forEach(item => {
             const itemType = item.getAttribute('data-type');
             const itemDate = new Date(item.getAttribute('data-date'));
-            let showItem = true;
             
-            // Filter by type
-            if (typeValue !== 'all' && itemType !== typeValue) {
-                showItem = false;
-            }
+            // Type filter
+            const typeMatch = typeValue === 'all' || itemType === typeValue;
             
-            // Filter by period
-            if (periodDate && itemDate < periodDate) {
-                showItem = false;
-            }
-            
-            // Show/hide item
-            if (showItem) {
-                item.style.display = 'flex';
-            } else {
-                item.style.display = 'none';
-            }
-        });
-    }
-    
-    // Apply filters when changed
-    typeFilter.addEventListener('change', filterTransactions);
-    periodFilter.addEventListener('change', filterTransactions);
-    
-    // Form submission
-    transactionForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        // Get form data
-        const formData = new FormData(this);
-        const transactionType = formData.get('transaction_type');
-        const amount = parseFloat(formData.get('amount'));
-        
-        // Validate amount
-        if (isNaN(amount) {
-            alert('Please enter a valid amount');
-            return;
-        }
-        
-        if (amount < 100) {
-            alert('Minimum amount is ₦100');
-            return;
-        }
-        
-        // Simulate form submission (in a real app, this would be an AJAX call)
-        const submitBtn = this.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-        
-        setTimeout(() => {
-            alert(`${transactionType.charAt(0).toUpperCase() + transactionType.slice(1)} of ₦${amount.toLocaleString()} initiated successfully!`);
-            transactionModal.classList.remove('active');
-            document.body.style.overflow = 'auto';
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = `<span id="submit-text">${submitText.textContent}</span> <i class="fas fa-arrow-right"></i>`;
-            
-            // In a real app, you would refresh the transaction list here
-        }, 1500);
-    });
-    
-    // Initialize filters
-    filterTransactions();
-});
-
-// static/js/wallet.js
-
-$(document).ready(function() {
-    const modalOverlay = $('#transaction-modal');
-    const modalTitle = $('#modal-title');
-    const transactionForm = $('#transaction-form');
-    const transactionTypeInput = $('#transaction-type-input');
-    const amountGroup = $('#amount-group');
-    const recipientGroup = $('#recipient-group');
-    const submitText = $('#submit-text');
-    const paymentMethodGroup = $('#payment-method-group');
-
-    // Function to open the modal
-    function openModal(action) {
-        modalOverlay.addClass('active');
-        transactionTypeInput.val(action); // Set hidden input for form submission
-
-        // Reset form fields
-        transactionForm[0].reset();
-        recipientGroup.hide(); // Hide recipient by default
-        paymentMethodGroup.show(); // Show payment method by default
-        amountGroup.find('label').text('Amount (₦)'); // Reset label
-
-        if (action === 'fund') {
-            modalTitle.text('Fund Wallet');
-            submitText.text('Proceed to Payment');
-            // Ensure payment method radios are visible for funding
-            paymentMethodGroup.show();
-        } else if (action === 'withdraw') {
-            modalTitle.text('Withdraw Funds');
-            submitText.text('Initiate Withdrawal');
-            paymentMethodGroup.hide(); // Hide payment method for withdrawals (assuming pre-linked bank)
-        } else if (action === 'transfer') {
-            modalTitle.text('Transfer Funds');
-            submitText.text('Confirm Transfer');
-            recipientGroup.show(); // Show recipient field for transfers
-            paymentMethodGroup.hide(); // Transfers are internal, no external payment method
-        }
-    }
-
-    // Event listeners for action buttons
-    $('[data-action]').click(function() {
-        const action = $(this).data('action');
-        openModal(action);
-    });
-
-    // Close modal
-    $('#close-modal, .modal-overlay').click(function(e) {
-        // Only close if clicking on the overlay itself, not inside the modal-content
-        if (e.target.id === 'transaction-modal' || e.target.id === 'close-modal') {
-            modalOverlay.removeClass('active');
-        }
-    });
-
-    // Prevent modal from closing when clicking inside its content
-    $('.modal-content').click(function(e) {
-        e.stopPropagation();
-    });
-
-    // Handle form submission (this will submit to Django view)
-    transactionForm.submit(function(e) {
-        // You might add client-side validation here before submitting
-        // Or integrate with a payment gateway for 'fund' action
-        // For now, let Django handle validation.
-        // The form action will be handled by the 'process_wallet_action' URL
-    });
-
-
-    // --- Transaction History Filtering (Client-side) ---
-    const transactionTypeFilter = $('#transaction-type');
-    const transactionPeriodFilter = $('#transaction-period');
-    const transactionItems = $('.transaction-item'); // Get all transaction items
-
-    function applyFilters() {
-        const selectedType = transactionTypeFilter.val();
-        const selectedPeriod = transactionPeriodFilter.val();
-        const now = new Date();
-
-        transactionItems.each(function() {
-            const item = $(this);
-            const itemType = item.data('type');
-            const itemDateStr = item.data('date');
-            const itemDate = new Date(itemDateStr); // Convert date string to Date object
-
-            let typeMatch = (selectedType === 'all' || itemType === selectedType);
+            // Period filter
             let periodMatch = true;
-
-            if (selectedPeriod === '7days') {
-                periodMatch = (now - itemDate) / (1000 * 60 * 60 * 24) <= 7;
-            } else if (selectedPeriod === '30days') {
-                periodMatch = (now - itemDate) / (1000 * 60 * 60 * 24) <= 30;
-            } else if (selectedPeriod === '90days') {
-                periodMatch = (now - itemDate) / (1000 * 60 * 60 * 24) <= 90;
+            if (periodValue !== 'all') {
+                const days = parseInt(periodValue.replace('days', ''));
+                const cutoffDate = new Date(now);
+                cutoffDate.setDate(now.getDate() - days);
+                periodMatch = itemDate >= cutoffDate;
             }
-            // 'all' periodMatch is always true by default
 
-            if (typeMatch && periodMatch) {
-                item.show();
-            } else {
-                item.hide();
-            }
+            item.style.display = typeMatch && periodMatch ? 'flex' : 'none';
         });
     }
 
-    // Attach change listeners to filters
-    transactionTypeFilter.on('change', applyFilters);
-    transactionPeriodFilter.on('change', applyFilters);
+    if (transactionTypeFilter && transactionPeriodFilter) {
+        addListener(transactionTypeFilter, 'change', filterTransactions);
+        addListener(transactionPeriodFilter, 'change', filterTransactions);
+    }
 
-    // Initial filter application on page load (important if you want client-side filtering after initial server render)
-    // Note: If you want server-side filtering, you would submit the form/make AJAX requests on filter change.
-    // For now, this is a client-side filter for the currently loaded transactions.
-    applyFilters();
+    // Initial filter
+    filterTransactions();
 
-    // Set the selected options based on Django context (if page reloads with filters)
-    // You already pass selected_type and selected_period from view context
-    transactionTypeFilter.val("{{ selected_type }}");
-    transactionPeriodFilter.val("{{ selected_period }}");
+    // --- Cleanup on page unload ---
+    window.addEventListener('beforeunload', cleanup);
 });
